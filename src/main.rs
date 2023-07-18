@@ -1,4 +1,5 @@
 use plonky2::{hash::hash_types::RichField, plonk::config::Hasher};
+use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 // use proof::{PathItem, Proof};
 use std::collections::VecDeque;
@@ -140,6 +141,22 @@ impl<F: RichField, H: Hasher<F>> MerkleTree<F, H> {
             }
         }
     }
+
+    /// Generates the proof of inclusion
+    pub fn get_proof(&self, value: Vec<F>) -> Option<Proof<F,H>>
+    {
+        // calculate hash of data
+        let calculated_hash = H::hash_or_noop(&value);
+        // and get the value of the root hash
+        let root_hash = self.root_hash();
+
+        // create a path first and feed it to Proof's construtor
+        PathItem::create_path(&self.root, calculated_hash).map(
+            |path| {
+                Proof::new(value, root_hash, path)
+            },
+        )
+    }
 }
 
 
@@ -237,6 +254,85 @@ impl <F: RichField, H: Hasher<F>>PathItem<F,H> {
         })
     }
 }
+
+impl <F: RichField, H: Hasher<F>> Proof<F, H> {
+    /// Produces new Proof structure
+    pub fn new(value: Vec<F>, root_hash: H::Hash, path_item: PathItem<F,H>) -> Self {
+        Proof {
+            value: value,
+            root_hash: root_hash,
+            path: path_item,
+        }
+    }
+
+    /// Validates the path
+    pub fn validate(&self, root_hash: H::Hash) -> bool {
+        // Check for the obvious things first
+        if root_hash != self.root_hash || self.path.hash != root_hash {
+            return false;
+        }
+
+        // recursive check the path
+        self.validate_recursive(&self.path)
+    }
+
+    fn validate_recursive(&self, path_item: &PathItem<F,H>) -> bool {
+        match path_item.sub_item {
+            Some(ref child) => {
+                match path_item.sibling_hash {
+                    Some(Position::Left(ref hash)) => {
+                        // calculating node hash taking into account that sibling's hash should be
+                        // the first parameter of hash_node_data() since it is positioned left
+                        let calculated_hash = H::two_to_one(*hash, child.hash);
+                        // it should match the node's hash
+                        (calculated_hash == path_item.hash) && self.validate_recursive(child)
+                    }
+                    Some(Position::Right(ref hash)) => {
+                        // calculating node hash taking into account that sibling's hash should be
+                        // the second parameter of hash_node_data() since it is positioned right
+                        let calculated_hash = H::two_to_one(child.hash, *hash);
+                        // it should match the node's hash
+                        (calculated_hash == path_item.hash) && self.validate_recursive(child)
+                    }
+                    None => false,
+                }
+            }
+            None => path_item.sibling_hash.is_none() && path_item.hash == H::hash_or_noop(&self.value),
+        }
+    }
+}
+
+fn random_data<F: RichField>(n: usize, k: usize) -> Vec<Vec<F>> {
+    (0..n).map(|_| F::rand_vec(k)).collect()
+}
 fn main() {
     println!("Hello, world!");
+    const D: usize = 2;
+    type C = PoseidonGoldilocksConfig;
+    type F = <C as GenericConfig<D>>::F;
+
+    // let leaves = random_data::<F>(4, 100);
+    // println!("{:?}",leaves);
+
+    let leaves = vec![
+    vec![GoldilocksField::from_canonical_u64(2890852870)],
+    vec![GoldilocksField::from_canonical_u64(156728478)], 
+    vec![GoldilocksField::from_canonical_u64(2876514289)], 
+    vec![GoldilocksField::from_canonical_u64(984286162)]
+    ];
+
+
+    let tree: MerkleTree<_, _> = MerkleTree::<F, <C as GenericConfig<D>>::Hasher>::from_vector(leaves.clone()).unwrap();
+
+    // println!("{:?}", tree);
+
+
+    let proof = tree.get_proof(vec![GoldilocksField::from_canonical_u64(2890852870)]);
+    // assert!(proof.is_some());
+    // println!("{:?}", proof.unwrap());
+
+    let result = proof.unwrap().validate(tree.root_hash());
+    assert!(result);
+    println!("{:?}", result);
+
 }
