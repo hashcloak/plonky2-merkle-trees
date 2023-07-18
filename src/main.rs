@@ -1,5 +1,8 @@
+// The following implementation is taken into reference https://github.com/skletsun/merkle-simple
+// This is just for practicing and understanding plonky2 and not to be used in production at all
+
 use plonky2::{hash::hash_types::RichField, plonk::config::Hasher};
-use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
+use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 // use proof::{PathItem, Proof};
 use std::collections::VecDeque;
@@ -302,15 +305,17 @@ impl <F: RichField, H: Hasher<F>> Proof<F, H> {
     }
 }
 
-fn random_data<F: RichField>(n: usize, k: usize) -> Vec<Vec<F>> {
-    (0..n).map(|_| F::rand_vec(k)).collect()
-}
+// fn random_data<F: RichField>(n: usize, k: usize) -> Vec<Vec<F>> {
+//     (0..n).map(|_| F::rand_vec(k)).collect()
+// }
 fn main() {
     println!("Hello, world!");
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
 
+    // // The cloning of leaves doesnt work because clone is not implemented for Vec<GoldilocksField>
+    // // Therefore hardcoding the values
     // let leaves = random_data::<F>(4, 100);
     // println!("{:?}",leaves);
 
