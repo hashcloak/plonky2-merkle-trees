@@ -1,13 +1,19 @@
 // The following implementation is taken into reference https://github.com/skletsun/merkle-simple
 // This is just for practicing and understanding plonky2 and not to be used in production at all
 
+use plonky2::hash::hash_types::HashOutTarget;
+use plonky2::iop::target::Target;
 use plonky2::{hash::hash_types::RichField, plonk::config::Hasher};
 use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, field::{goldilocks_field::GoldilocksField, types::Field}};
-
-// use proof::{PathItem, Proof};
+// use plonky2::hash::hash_types::{HashOutTarget, MerkleCapTarget};
+use plonky2::plonk::config::AlgebraicHasher;
+use plonky2::field::extension::Extendable;
+use plonky2::plonk::circuit_builder::CircuitBuilder;
+use anyhow::Result;
+use plonky2::plonk::circuit_data::CircuitConfig;
+use plonky2::iop::witness::PartialWitness;
 use std::collections::VecDeque;
-// use treeelement::TreeElement;
-// use utils::{Hashable, Hasher};
+
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Common type for leafs and internal nodes.
@@ -308,11 +314,15 @@ impl <F: RichField, H: Hasher<F>> Proof<F, H> {
 // fn random_data<F: RichField>(n: usize, k: usize) -> Vec<Vec<F>> {
 //     (0..n).map(|_| F::rand_vec(k)).collect()
 // }
-fn main() {
+fn main() -> Result<()>{
     println!("Hello, world!");
+
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
+    let config = CircuitConfig::standard_recursion_config();
+    let mut pw: PartialWitness<_> = PartialWitness::<F>::new();
+    let mut builder = CircuitBuilder::<F, D>::new(config);
 
     // // The cloning of leaves doesnt work because clone is not implemented for Vec<GoldilocksField>
     // // Therefore hardcoding the values
@@ -340,4 +350,92 @@ fn main() {
     assert!(result);
     println!("{:?}", result);
 
+
+    // let x1 = PositionTarget::Left((builder.add_virtual_hash()));
+    // let x2 = PositionTarget::Right((builder.add_virtual_hash()));
+
+    // let path_t = PathItemTarget {
+    //     hash: builder.add_virtual_hash(),
+    //     sibling_hash: Some((x1)),
+    //     sub_item: Some(path_t),
+    // };
+
+    // let proof_t = ProofTarget{
+    //     value: builder.add_virtual_targets(1),
+    //     root_hash: builder.add_virtual_hash(),
+    //     path: path_t,
+    // };
+    
+    Ok(())
 }
+
+#[derive(Clone, Debug)]
+pub struct ProofTarget {
+    /// Value to verify
+    value: Vec<Target>,
+
+    /// Root hash of the treeEleTreeElement
+    root_hash: HashOutTarget,
+
+    /// Starting point of proof-path
+    path: PathItemTarget,
+}
+
+#[derive(Clone, Debug)]
+
+pub struct PathItemTarget {
+    /// Hash of current node
+    hash: HashOutTarget,
+
+    /// Hash of sibling if any. Leaf element doesn't have any siblings so we wrap it with Option.
+    sibling_hash: Option<PositionTarget>,
+
+    /// Reference to the child node in the direction from root to leafs
+    sub_item: Option<Box<PathItemTarget>>,
+}
+
+#[derive(Clone, Debug)]
+
+enum PositionTarget {
+    /// For the left sibling
+    Left(HashOutTarget),
+
+    /// For the right sibling
+    Right(HashOutTarget),
+}
+
+// #[allow(non_snake_case)]
+// pub fn verification_circuit<F: RichField + Extendable<D> , const D: usize>(
+//     builder: &mut CircuitBuilder<F,D>,
+//     proof: ProofTarget,
+//     rootHash: HashOutTarget
+// ) {
+    
+// }
+
+// pub fn verify<F: RichField, H: AlgebraicHasher<F>>(proof: ProofTarget, rootHash: HashOutTarget) -> bool{ 
+
+//     match proof.path.sub_item {
+//         Some(ref child) => {
+//             match proof.path.sibling_hash {
+//                 Some(PositionTarget::Left(ref hash)) => {
+//                     // calculating node hash taking into account that sibling's hash should be
+//                     // the first parameter of hash_node_data() since it is positioned left
+//                     let calculated_hash = Hasher::two_to_one(hash, child.hash);
+//                     // it should match the node's hash
+//                     (calculated_hash == proof.path.hash) && verify(proof, child.hash)
+//                 }
+//                 Some(PositionTarget::Right(ref hash)) => {
+//                     // calculating node hash taking into account that sibling's hash should be
+//                     // the second parameter of hash_node_data() since it is positioned right
+//                     let calculated_hash = Hasher::two_to_one(child.hash, *hash);
+//                     // it should match the node's hash
+//                     (calculated_hash == proof.path.hash) && verify(proof, child.hash)
+//                 }
+//                 None => false,
+//             }
+//         }
+//         None => proof.path.sibling_hash.is_none() && proof.path.hash == Hasher::hash_or_noop(&rootHash),
+//     }
+// }
+
