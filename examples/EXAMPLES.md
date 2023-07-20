@@ -29,12 +29,9 @@ In the tests witness is created and together with the circuit, a proof is create
 
 ## merkle_proof_example2
 
-## merkle_proof_recursive
+Example of how to make a recursive proof. This verifies the merkle proof in a recursive way: per layer in the merkle tree 1 proof, and for every consecutive step the previous proof is added to the circuit and verified, as well as the next step of verifying data. 
 
-WIP. Has to be reviewed. 
-
-Exercise in using recursive proof to prove all leaves of a Merkle tree are leaves of the Merkle tree. 
-
-Has been made using following examples:
+Check following reference examples for recursive proofs in Plonky2:
 - https://github.com/polymerdao/plonky2-ed25519/blob/8fb5654b8bce6daff1145761a4db015183662838/src/main.rs
 - https://github.com/morgana-proofs/plonky2-hashchain/blob/main/src/hashchain.rs 
+- https://github.com/mir-protocol/plonky2/blob/main/plonky2/examples/bench_recursion.rs
