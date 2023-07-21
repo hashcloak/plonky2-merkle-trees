@@ -134,19 +134,12 @@ pub fn verify_merkle_proof_circuit_and_proof(
 
   let mut pw = plonky2::iop::witness::PartialWitness::new();
   let mut current_leaf_index = leaf_index;
-  let mut expected;
   if current_leaf_index % 2 == 0 {
-    // Left hash
     pw.set_hash_target(initial_targets[0], leaf_value);
-    // Right hash
     pw.set_hash_target(initial_targets[1], merkle_proof[0]);
-    expected = PoseidonHash::two_to_one(leaf_value, merkle_proof[0]);
   } else {
-    // Left hash
     pw.set_hash_target(initial_targets[0], merkle_proof[0]);
-    // Right hash
     pw.set_hash_target(initial_targets[1], leaf_value);
-    expected = PoseidonHash::two_to_one(merkle_proof[0], leaf_value);
   }
 
   current_leaf_index = current_leaf_index/2;
