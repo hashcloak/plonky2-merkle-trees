@@ -5,7 +5,7 @@ use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig, Hasher, PoseidonHashConfig};
-use plonky2_merkle_trees::merkle_tree::simple_merkle_tree::MerkleTree;
+use plonky2_merkle_trees::simple_merkle_tree::simple_merkle_tree::MerkleTree;
 
 
 fn main() -> Result<()> {

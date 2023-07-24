@@ -115,7 +115,7 @@ mod tests {
 use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 
-use crate::merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
+use crate::simple_merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
 
   #[test]
   fn test_build_merkle_tree_4_leaves() -> Result<()> {

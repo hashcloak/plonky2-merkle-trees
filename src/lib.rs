@@ -1,1 +1,2 @@
-pub mod merkle_tree;
+pub mod simple_merkle_tree;
+pub mod mmr;

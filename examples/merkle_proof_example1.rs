@@ -68,7 +68,7 @@ mod tests {
   use anyhow::Result;
   use plonky2::{plonk::config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, hash::{poseidon::PoseidonHash, hash_types::RichField}, iop::witness::WitnessWrite, gates::poseidon::PoseidonGenerator};
 use plonky2_field::{goldilocks_field::GoldilocksField, types::{Field, Sample}};
-  use plonky2_merkle_trees::merkle_tree::simple_merkle_tree::MerkleTree;
+  use plonky2_merkle_trees::simple_merkle_tree::simple_merkle_tree::MerkleTree;
 use rand::Rng;
 
   use crate::verify_merkle_proof_circuit;
