@@ -2,6 +2,8 @@
 
 Practice with Plonky2.
 
+The example files have either a `main` that can be run, or tests in the file itself that can be run. Click `Run` or `Run Test` in your IDE. 
+
 ## cube
 
 Create proof for "I know xˆ3"
