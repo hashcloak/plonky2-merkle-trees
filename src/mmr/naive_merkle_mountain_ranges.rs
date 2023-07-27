@@ -203,13 +203,13 @@ impl MMR {
       // count the nr of occurrences of this height in the height list
       let count = self.heights.iter().filter(|&&h| h == height.to_u32().unwrap_or(0)).count();
 
-      for c in 0..count {
+      for _c in 0..count {
         print!(" ");
         print!("/\\");
         print!(" ");
       }
 
-      for j in 0..height {
+      for _j in 0..height {
         print!("\n");
       }
     }
@@ -235,7 +235,7 @@ fn get_merkle_proof(
       max_height: u32) -> Vec<HashOut<GoldilocksField>> {
   assert!(subtree_heights[leaf_index] == 0); // check that the given index actually belongs to a leaf
   let mut proof_hashes = Vec::new();
-  let mut updated_index = leaf_index;
+  let mut updated_index;
 
   // First, get the other leaf
   let leaf_right = leaf_index + 1 < subtree_heights.len() && subtree_heights[leaf_index + 1] == 0;
@@ -315,7 +315,7 @@ use rand::Rng;
   fn test_tree_7_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
-    for i in 0..6 {
+    for _i in 0..6 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     // Uncomment this for checking what the mmr looks like. Note that the paint function is terrible
@@ -331,7 +331,7 @@ use rand::Rng;
   fn test_bagging_peaks_4_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
-    for i in 0..3 {
+    for _i in 0..3 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
 
@@ -346,7 +346,7 @@ use rand::Rng;
   fn test_bagging_peaks_7_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
-    for i in 0..6 {
+    for _i in 0..6 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     
@@ -364,7 +364,7 @@ use rand::Rng;
   fn test_bagging_peaks_30_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
-    for i in 0..30 {
+    for _i in 0..30 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     
@@ -381,7 +381,7 @@ use rand::Rng;
   fn test_merkle_proof_subtree_index0() -> Result<()> {
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
-    for i in 0..7 {
+    for _i in 0..7 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     let subtree = mmr.elements.clone();
@@ -397,7 +397,7 @@ use rand::Rng;
   fn test_merkle_proof_subtree_index8() -> Result<()> {
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
-    for i in 0..7 {
+    for _i in 0..7 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     let subtree = mmr.elements.clone();
@@ -414,7 +414,7 @@ use rand::Rng;
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
     let mut mmr = MMR::new(leaf0);
-    for i in 0..7 {
+    for _i in 0..7 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     let mmr_bagged = mmr.clone().bagging_the_peaks();
@@ -525,7 +525,7 @@ use rand::Rng;
   fn test_mmr_proof_tree_8_leaves_all_indices() -> Result<()> {
     let mut leaves = Vec::new();
     let mut rng = rand::thread_rng();
-    for i in 0..8 {
+    for _i in 0..8 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
     let mut mmr = MMR::new(leaves[0]);
@@ -570,7 +570,7 @@ use rand::Rng;
   fn test_mmr_proof_tree_16_leaves_all_indices() -> Result<()> {
     let mut leaves = Vec::new();
     let mut rng = rand::thread_rng();
-    for i in 0..16 {
+    for _i in 0..16 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
     let mut mmr = MMR::new(leaves[0]);
@@ -643,7 +643,7 @@ use rand::Rng;
   fn test_mmr_proof_tree_18_leaves_all_indices() -> Result<()> {
     let mut leaves = Vec::new();
     let mut rng = rand::thread_rng();
-    for i in 0..18 {
+    for _i in 0..18 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
     let mut mmr = MMR::new(leaves[0]);
@@ -714,7 +714,7 @@ use rand::Rng;
   fn test_mmr_proof_tree_21_leaves_all_indices() -> Result<()> {
     let mut leaves = Vec::new();
     let mut rng = rand::thread_rng();
-    for i in 0..22 {
+    for _i in 0..22 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
     let mut mmr = MMR::new(leaves[0]);
@@ -792,6 +792,5 @@ use rand::Rng;
     assert!(verified16 && verified17 && verified18 && verified19 && verified20);
     Ok(())
   }
-
 
 }
