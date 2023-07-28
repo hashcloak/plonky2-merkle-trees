@@ -119,29 +119,10 @@ impl MMR {
   // Return MMR proof, which consists of:
   // - (standard) Merkle proof for the subtree of which the leaf is part of
   // - all the peaks
-  // - the (relative) index of the leaf in the subtree
+  // - index of leaf within the subtree
   pub fn get_proof(self, index: usize) -> (Vec<HashOut<GoldilocksField>>, Vec<HashOut<GoldilocksField>>, usize) {
-    // 1. Find the subtree of which the leaf is part of
-
-    // From the index, go to the right and decide where the highest peak is 
-    //   (keep in mind that we know the height of highest peaks)
-    let mut highest_peak_subtree: u32 = 0;
-    let mut index_highest_peak= 0;
-    for i in index..self.elements.len() {
-      if self.heights[i] > highest_peak_subtree {
-        highest_peak_subtree = self.heights[i];
-        index_highest_peak = i;
-        if highest_peak_subtree == self.max_height {
-          break;
-        }
-      }
-    }
-
-    // From that peak, we know how many elements make up the sub-tree
-    // 2^h * 2 -1
-    let len_subtree: usize = (2u32.pow(highest_peak_subtree)*2-2).to_usize().unwrap();
-
-    let start = index_highest_peak - len_subtree;
+    // 1. Determine subtree information that the leaf is part of
+    let (highest_peak_subtree, index_highest_peak, start) = get_info_subtree_leaf_index(&self, index);
     let subtree = &self.elements[start..index_highest_peak];
     let subtree_heights = &self.heights[start..index_highest_peak];
 
@@ -149,7 +130,29 @@ impl MMR {
     let relative_index = index - start;
     let merkle_proof = get_merkle_proof(subtree.to_vec(), subtree_heights.to_vec(), relative_index, highest_peak_subtree);
 
-    // 3. Return merkle proof with peaks
+    // 3. Return merkle proof, peaks and leaf index within subtree
+    (merkle_proof, self.peaks, relative_index)
+  }
+
+  // Return MMR proof with an extended Merkle proof, consisting of:
+  // - Merkle proof for the subtree of which the leaf is part of WITH ROOT. 
+  //     In a standard Merkle proof the root is not included, but this is useful for the recursive step, and included here
+  // - all the peaks of the MMR
+  // - index of leaf within the subtree
+  pub fn get_proof_with_extended_merkleproof(self, index: usize) -> (Vec<HashOut<GoldilocksField>>, Vec<HashOut<GoldilocksField>>, usize) {
+    // 1. Determine subtree information that the leaf is part of
+    let (highest_peak_subtree, index_highest_peak, start) = get_info_subtree_leaf_index(&self, index);
+    let subtree = &self.elements[start..=index_highest_peak];
+    let subtree_heights = &self.heights[start..index_highest_peak];
+
+    // 2. Get the Merkle proof for the subtree, including the root at the end - which is normally the value the final hash is compared to
+    let relative_index = index - start;
+    let mut merkle_proof = get_merkle_proof(subtree.to_vec(), subtree_heights.to_vec(), relative_index, highest_peak_subtree);
+    
+    // Additionally, add the root of the subtree to the proof 
+    merkle_proof.push(*subtree.last().unwrap());
+
+    // 3. Return merkle proof, peaks and leaf index within subtree
     (merkle_proof, self.peaks, relative_index)
   }
 
@@ -226,6 +229,34 @@ impl MMR {
   
 }
 
+// Every leaf in an MMR is also part of a perfect Merkle tree, which is a subtree of the MMR
+// For the given leaf_index, return:
+// - height of subtree that leaf is part of
+// - index of that peak (in the MMR)
+// - index of start subtree (in the MMR)
+pub fn get_info_subtree_leaf_index(mmr: &MMR, leaf_index: usize) -> (u32, usize, usize) {
+  // From the index, go to the right and decide where the highest peak is 
+  //   (keep in mind that we know the height of highest peaks)
+  let mut highest_peak_subtree: u32 = 0;
+  let mut index_highest_peak= 0;
+  for i in leaf_index..mmr.elements.len() {
+    if mmr.heights[i] > highest_peak_subtree {
+      highest_peak_subtree = mmr.heights[i];
+      index_highest_peak = i;
+      if highest_peak_subtree == mmr.max_height {
+        break;
+      }
+    }
+  }
+
+  // From that peak, we know how many elements make up the sub-tree
+  // 2^h * 2 -1
+  let len_subtree: usize = (2u32.pow(highest_peak_subtree)*2-2).to_usize().unwrap();
+
+  let start = index_highest_peak - len_subtree;
+  (highest_peak_subtree, index_highest_peak, start)
+}
+
 
 // Return a (standard) Merkle proof for the given subtree
 fn get_merkle_proof(
@@ -253,7 +284,7 @@ fn get_merkle_proof(
   for h in 1..max_height {
     let diff: usize = (2i32.pow(h+1) -1).to_usize().unwrap();
 
-    // Because of how to tree was built, only the sibling that is exactly at 2^(h+1) - 1 distance is needed for the next step
+    // Because of how the tree was built, only the sibling that is exactly at 2^(h+1) - 1 distance is needed for the next step
     // So check this elements (1) exists and (2) has the same height
     if updated_index + diff < subtree.len() && subtree_heights[updated_index + diff] == h {
       proof_hashes.push(subtree[updated_index + diff]);
