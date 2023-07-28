@@ -15,7 +15,7 @@ In the initial step the 2 hashes of the leaves are the input, and the hash of th
 In the recursive step, the proof of the previous step is used in the circuit, as well as the hash on the other side and once again the expected result (Merkle digest) is the public input. 
 <p float="left">
   <img src="img/recursive_step_merkle_tree_ref.png" width="300" />
-  <img src="img/recursive_step.png" width="500" /> 
+  <img src="img/recursive_step_1.png" width="500" /> 
 </p>
 
 This recursive pattern is repeated until all levels have been traversed and a single proof that verifies the total merkle proof is the result. 
@@ -63,7 +63,7 @@ Returning both the circuit data and the elements that have to be added to the wi
 ### Details: recursive_step
 
 Recall that for this step we have the following flow:
-<p><img src="img/recursive_step.png" width="500"></p>
+<p><img src="img/recursive_step_1.png" width="500"></p>
 
 Thus, inputs are a previous proof and a next hash. As public input (and thus the desired outcome) we have the Merkle digest. 
 
