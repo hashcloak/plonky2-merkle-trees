@@ -111,10 +111,8 @@ pub fn verify_merkle_proof(leaf: GoldilocksField, leaf_index: usize, root: HashO
 #[cfg(test)]
 mod tests {
   use anyhow::Result;
-use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
-
-
-use crate::simple_merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
+  use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
+  use crate::simple_merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
 
   #[test]
   fn test_build_merkle_tree_4_leaves() -> Result<()> {

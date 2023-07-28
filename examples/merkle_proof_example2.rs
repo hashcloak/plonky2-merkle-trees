@@ -32,7 +32,7 @@ use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Poseidon
   w_targets.push(left_hash_target);
   w_targets.push(right_hash_target);
 
-  let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+  let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
     left_hash_target.elements.to_vec(), 
     right_hash_target.elements.to_vec()
   ].concat());
@@ -90,7 +90,7 @@ use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Poseidon
     // Add target for sibling hash (that's on the right)
     let right_hash_target = builder.add_virtual_hash();
     targets.push(right_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       input_hash.elements.to_vec(), 
       right_hash_target.elements.to_vec()
     ].concat());
@@ -100,7 +100,7 @@ use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Poseidon
     // Add target for sibling hash (that's on the left)
     let left_hash_target = builder.add_virtual_hash();
     targets.push(left_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       left_hash_target.elements.to_vec(),
       input_hash.elements.to_vec()
     ].concat());

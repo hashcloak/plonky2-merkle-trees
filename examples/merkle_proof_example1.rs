@@ -26,12 +26,12 @@ pub fn verify_merkle_proof_circuit(leaf_index: usize, nr_layers: usize) -> (Circ
 
   let mut next_hash: plonky2::hash::hash_types::HashOutTarget;
   if leaf_index % 2 == 0 {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       leaf_to_prove.elements.to_vec(), 
       merkle_proof_elm.elements.to_vec()
     ].concat());
   } else {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       merkle_proof_elm.elements.to_vec(),
       leaf_to_prove.elements.to_vec()
     ].concat());
@@ -44,12 +44,12 @@ pub fn verify_merkle_proof_circuit(leaf_index: usize, nr_layers: usize) -> (Circ
     targets.push(merkle_proof_elm);
 
     if current_layer_index % 2 == 0 {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         next_hash.elements.to_vec(), 
         merkle_proof_elm.elements.to_vec()
       ].concat());
     } else {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         merkle_proof_elm.elements.to_vec(),
         next_hash.elements.to_vec()
       ].concat());
