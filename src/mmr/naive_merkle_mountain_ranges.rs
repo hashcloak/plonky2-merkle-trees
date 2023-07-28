@@ -337,7 +337,7 @@ pub fn get_standard_index(leaf_index: usize, nr_leaves: usize) -> usize {
 mod tests {
   use anyhow::Result;
   use itertools::Itertools;
-use rand::Rng;
+  use rand::Rng;
   use plonky2::{field::{goldilocks_field::GoldilocksField, types::Field}, hash::poseidon::PoseidonHash, plonk::config::Hasher};
   use crate::mmr::naive_merkle_mountain_ranges::{MMR, get_merkle_proof, get_standard_index};
   const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use num::ToPrimitive;
-use plonky2::{plonk::{config::{PoseidonHashConfig, PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig}, circuit_builder::CircuitBuilder}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig}, circuit_builder::CircuitBuilder}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
 use crate::mmr::naive_merkle_mountain_ranges::get_standard_index;
@@ -36,12 +36,12 @@ pub fn verify_mmr_proof_circuit(
   let standardized_index = get_standard_index(relative_leaf_index, nr_leaves_subtree);
 
   if standardized_index % 2 == 0 {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       leaf_to_prove.elements.to_vec(), 
       merkle_proof_elm.elements.to_vec()
     ].concat());
   } else {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       merkle_proof_elm.elements.to_vec(),
       leaf_to_prove.elements.to_vec()
     ].concat());
@@ -52,12 +52,12 @@ pub fn verify_mmr_proof_circuit(
     targets.push(merkle_proof_elm);
 
     if current_layer_index % 2 == 0 {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         next_hash.elements.to_vec(), 
         merkle_proof_elm.elements.to_vec()
       ].concat());
     } else {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         merkle_proof_elm.elements.to_vec(),
         next_hash.elements.to_vec()
       ].concat());
@@ -85,7 +85,7 @@ pub fn verify_mmr_proof_circuit(
   // builder.assert_bool(hash_in_peaks);
 
   if peaks.len() > 1 {
-    let root = builder.hash_n_to_hash_no_pad::<PoseidonHashConfig, PoseidonHash>(peaks.into_iter().flat_map(|x| x.elements).collect_vec());
+    let root = builder.hash_n_to_hash_no_pad::<PoseidonHash>(peaks.into_iter().flat_map(|x| x.elements).collect_vec());
     // This is the expected root value (bagged MMR)
     builder.register_public_inputs(&root.elements);
   } else {

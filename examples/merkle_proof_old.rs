@@ -33,7 +33,7 @@ fn main() -> Result<()> {
     let start_hash_target = builder.add_virtual_hash();
     let hash0 = builder.add_virtual_hash();
 
-    builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([start_hash_target.elements.to_vec(), hash0.elements.to_vec()].concat());
+    builder.hash_or_noop::<PoseidonHash>([start_hash_target.elements.to_vec(), hash0.elements.to_vec()].concat());
 
     let mut pw = PartialWitness::new();
     pw.set_hash_target(start_hash_target, leaf_hashed);

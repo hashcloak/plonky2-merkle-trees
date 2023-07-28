@@ -25,13 +25,13 @@ pub fn verify_merkle_proof_circuit() -> CircuitData<GoldilocksField, PoseidonGol
   let merkle_proof_elm_0 = builder.add_virtual_hash();
   let merkle_proof_elm_1 = builder.add_virtual_hash();
 
-  let level1_hash: plonky2::hash::hash_types::HashOutTarget = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+  let level1_hash: plonky2::hash::hash_types::HashOutTarget = builder.hash_or_noop::<PoseidonHash>([
     leaf_to_prove.elements.to_vec(), 
     merkle_proof_elm_0.elements.to_vec()
   ].concat());
 
   // This is how we set the constraint of the expected root wrt the computed value
-  let expected_root = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+  let expected_root = builder.hash_or_noop::<PoseidonHash>([
     level1_hash.elements.to_vec(),
     merkle_proof_elm_1.elements.to_vec()
   ].concat());

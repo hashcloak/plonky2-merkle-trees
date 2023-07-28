@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use num::ToPrimitive;
-use plonky2::{plonk::{config::{PoseidonHashConfig, PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig, CommonCircuitData, VerifierCircuitTarget}, circuit_builder::CircuitBuilder, proof::ProofWithPublicInputsTarget}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig, CommonCircuitData, VerifierCircuitTarget}, circuit_builder::CircuitBuilder, proof::ProofWithPublicInputsTarget}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
 use crate::mmr::{naive_merkle_mountain_ranges::get_standard_index, mmr_plonky2_verifier::{equal, or_list}};
@@ -43,12 +43,12 @@ pub fn verify_inner_merkle_proof_circuit(
   let standardized_index = get_standard_index(relative_leaf_index, nr_leaves_subtree);
 
   if standardized_index % 2 == 0 {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       leaf_to_prove.elements.to_vec(), 
       merkle_proof_elm.elements.to_vec()
     ].concat());
   } else {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       merkle_proof_elm.elements.to_vec(),
       leaf_to_prove.elements.to_vec()
     ].concat());
@@ -59,12 +59,12 @@ pub fn verify_inner_merkle_proof_circuit(
     targets.push(merkle_proof_elm);
 
     if current_layer_index % 2 == 0 {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         next_hash.elements.to_vec(), 
         merkle_proof_elm.elements.to_vec()
       ].concat());
     } else {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         merkle_proof_elm.elements.to_vec(),
         next_hash.elements.to_vec()
       ].concat());
@@ -127,7 +127,7 @@ pub fn complete_verification_circuit_with_inner_proof(
   builder.connect(one, hash_in_peaks.target); 
 
   if peaks.len() > 1 {
-    let root = builder.hash_n_to_hash_no_pad::<PoseidonHashConfig, PoseidonHash>(peaks.into_iter().flat_map(|x| x.elements).collect_vec());
+    let root = builder.hash_n_to_hash_no_pad::<PoseidonHash>(peaks.into_iter().flat_map(|x| x.elements).collect_vec());
     // This is the expected root value (bagged MMR)
     builder.register_public_inputs(&root.elements);
   } else {
@@ -150,9 +150,9 @@ mod tests {
   use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
   use rand::Rng;
 
-use crate::mmr::naive_merkle_mountain_ranges::MMR;
+  use crate::mmr::naive_merkle_mountain_ranges::MMR;
 
-use super::{verify_inner_merkle_proof_circuit, complete_verification_circuit_with_inner_proof};
+  use super::{verify_inner_merkle_proof_circuit, complete_verification_circuit_with_inner_proof};
   const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
 
   pub fn do_test_verify_inner_proof(nr_leaves: usize, leaf_index: usize) -> Result<()> {
