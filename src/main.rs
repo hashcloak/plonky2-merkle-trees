@@ -123,14 +123,24 @@ impl<F: RichField, H: Hasher<F>> IncrementalTree<F, H> {
         let mut node = leaf;
         for (sibling, p) in siblings.iter().zip(pos.iter()) {
             if *p {
-                node = H::two_to_one(node, *sibling);
-            } else {
                 node = H::two_to_one(*sibling, node);
+            } else {
+                node = H::two_to_one(node, *sibling);
+
             }
         }
 
         node == self.root
     }
+
+    pub fn root(&self) -> H::Hash {
+        self.root
+    }
+
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+
 }
 
 // fn random_data<F: Field>(n: usize, k: usize) -> Vec<Vec<F>> {
