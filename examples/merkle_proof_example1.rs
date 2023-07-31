@@ -1,4 +1,4 @@
-use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, PoseidonHashConfig}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData}, proof}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::witness::{WitnessWrite, PartialWitness}, field::{goldilocks_field::GoldilocksField, types::Field}};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData}, proof}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::witness::{WitnessWrite, PartialWitness}, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 /**
  * zkp for veryfing merkle proof

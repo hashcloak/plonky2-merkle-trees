@@ -1,5 +1,5 @@
 use anyhow::Result;
-use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, PoseidonHashConfig, Hasher}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData, VerifierCircuitTarget}, proof::{self, ProofWithPublicInputsTarget, ProofWithPublicInputs}}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::{witness::{WitnessWrite, PartialWitness}, target::Target}, field::{goldilocks_field::GoldilocksField, types::Field}};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData, VerifierCircuitTarget}, proof::{self, ProofWithPublicInputsTarget, ProofWithPublicInputs}}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::{witness::{WitnessWrite, PartialWitness}, target::Target}, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 /**
  * Recursive zkp for verifying merkle proof.

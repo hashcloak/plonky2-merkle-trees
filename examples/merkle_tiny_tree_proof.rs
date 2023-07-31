@@ -1,5 +1,5 @@
 use anyhow::Result;
-use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Hasher, PoseidonHashConfig}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData}, proof}, hash::{hash_types::{RichField, HashOut}, poseidon::PoseidonHash}, iop::witness::{WitnessWrite, PartialWitness}, field::{goldilocks_field::GoldilocksField, types::Field}};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData}, proof}, hash::{hash_types::{RichField, HashOut}, poseidon::PoseidonHash}, iop::witness::{WitnessWrite, PartialWitness}, field::{goldilocks_field::GoldilocksField, types::Field}};
 use plonky2_merkle_trees::simple_merkle_tree::simple_merkle_tree::MerkleTree;
 
 /**
