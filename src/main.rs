@@ -1,14 +1,17 @@
-// use plonky2::hash::hash_types::HashOutTarget;
+use plonky2::hash::hash_types::HashOutTarget;
 // use plonky2::iop::target::Target;
 use plonky2::{hash::hash_types::RichField, plonk::config::Hasher};
 use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, field::{goldilocks_field::GoldilocksField, types::Field}};
 // use plonky2::plonk::config::AlgebraicHasher;
-// use plonky2::field::extension::Extendable;
-// use plonky2::plonk::circuit_builder::CircuitBuilder;
+use plonky2::field::extension::Extendable;
+use plonky2::plonk::circuit_builder::CircuitBuilder;
 // use anyhow::Result;
-// use plonky2::plonk::circuit_data::CircuitConfig;
-// use plonky2::iop::witness::PartialWitness;
+use plonky2::plonk::circuit_data::CircuitConfig;
+use plonky2::iop::witness::PartialWitness;
 use plonky2::hash::poseidon::PoseidonHash;
+use plonky2::plonk::config::AlgebraicHasher;
+use plonky2::iop::target::BoolTarget;
+use plonky2::iop::witness::WitnessWrite;
 use std::iter;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -143,31 +146,23 @@ impl<F: RichField, H: Hasher<F>> IncrementalTree<F, H> {
 
 }
 
-// fn random_data<F: Field>(n: usize, k: usize) -> Vec<Vec<F>> {
-//     (0..n).map(|_| F::rand_vec(k)).collect()
-// }
 
 fn main() {
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
-    // let config = CircuitConfig::standard_recursion_config();
-    // let mut pw: PartialWitness<_> = PartialWitness::<F>::new();
-    // let mut builder = CircuitBuilder::<F, D>::new(config);
+    let config = CircuitConfig::standard_recursion_config();
+    let mut pw: PartialWitness<_> = PartialWitness::<F>::new();
+    let mut builder = CircuitBuilder::<F, D>::new(config);
 
-    // let log_n = 8;
-    // let n = 1 << log_n;
     let cap_height = 3;
-    // let leaves = random_data::<F>(n, 7);
     let zero = vec![GoldilocksField::from_canonical_u64(0)];
     let one = vec![GoldilocksField::from_canonical_u64(1)];
     let two = vec![GoldilocksField::from_canonical_u64(2)];
     let three = vec![GoldilocksField::from_canonical_u64(3)];
     let four = vec![GoldilocksField::from_canonical_u64(4)];
     let five = vec![GoldilocksField::from_canonical_u64(5)];
-
-
 
     let zero_hash = PoseidonHash::hash_or_noop(&zero);
     let one_hash = PoseidonHash::hash_or_noop(&one);
@@ -178,7 +173,6 @@ fn main() {
 
 
     let mut tree = IncrementalTree::<F, <C as GenericConfig<D>>::Hasher>::new(zero_hash, cap_height);
-    println!("{:?}", tree);
 
     tree.insert(one_hash);
     tree.insert(two_hash);
@@ -186,9 +180,78 @@ fn main() {
     tree.insert(four_hash);
     tree.insert(five_hash);
 
-    println!("{:?}", tree);
-
     let (siblings, pos) = tree.witness(five_hash);
-    println!("{:?}", tree.check_proof(five_hash, siblings, pos));
-    println!("Hello, world!");
+    println!("{:?}", tree.check_proof(five_hash, siblings.clone(), pos.clone()));
+
+    let mut targets: Vec<HashOutTarget> = Vec::new();
+
+    let node = builder.add_virtual_hash();
+    targets.push(node);
+
+    let root = builder.add_virtual_hash();
+    targets.push(root);
+
+    let siblings_t = builder.add_virtual_hashes(siblings.clone().len());
+
+    let mut next_hash: plonky2::hash::hash_types::HashOutTarget;
+
+    for (&p, &sibling) in pos.iter().zip(&siblings_t) {   
+
+        if p {
+                    next_hash = builder.hash_or_noop::<PoseidonHash>([
+                        sibling.elements.to_vec(),
+                        node.elements.to_vec()
+                      ].concat());
+                } else {
+                    next_hash = builder.hash_or_noop::<PoseidonHash>([
+                        node.elements.to_vec(),
+                        sibling.elements.to_vec()
+                        ].concat());
+    
+                }
+    }
+    
+    
+    
+    // pw.set_hash_target(leaf, five_hash);
+
+    let root_t = builder.add_virtual_hash();
+    pw.set_hash_target(root_t, tree.root);
+
+    let siblings_t = builder.add_virtual_hashes(siblings.clone().len());
+
+    for i in 0..siblings.clone().len() {
+        pw.set_hash_target(siblings_t[i], siblings[i]);
+    }
+
+
+
+
 }
+
+
+pub fn verify<F: RichField + Extendable<D>, H: AlgebraicHasher<F>, const D: usize>(
+    builder: &mut CircuitBuilder<F, D>,
+    pos: Vec<bool>,
+    siblings: Vec<HashOutTarget>,
+    root: HashOutTarget,
+    leaf: HashOutTarget,
+) {
+
+    let initial = builder.add_virtual_target();
+
+    let mut node = leaf;
+    for (&p, &sibling) in pos.iter().zip(&siblings) {   
+
+        //  if p {
+        //         node = builder.hash_or_noop([
+        //             siblings.to_vec(),
+        //             vec![node]
+        //           ].concat());
+        //     } else {
+        //         node = H::two_to_one(node, *sibling);
+
+        //     }
+        }
+
+    }
