@@ -1,19 +1,19 @@
-use plonky2::hash::hash_types::HashOutTarget;
+// use plonky2::hash::hash_types::HashOutTarget;
 // use plonky2::iop::target::Target;
 use plonky2::{hash::hash_types::RichField, plonk::config::Hasher};
 use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, field::{goldilocks_field::GoldilocksField, types::Field}};
 // use plonky2::plonk::config::AlgebraicHasher;
-use plonky2::field::extension::Extendable;
+// use plonky2::field::extension::Extendable;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 // use anyhow::Result;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::iop::witness::PartialWitness;
 use plonky2::hash::poseidon::PoseidonHash;
-use plonky2::plonk::config::AlgebraicHasher;
-use plonky2::iop::target::BoolTarget;
+// use plonky2::plonk::config::AlgebraicHasher;
+// use plonky2::iop::target::BoolTarget;
 use plonky2::iop::witness::WitnessWrite;
 use std::iter;
-
+use anyhow::Result;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IncrementalTree<F: RichField, H: Hasher<F>> {
     root: H::Hash,
@@ -147,7 +147,7 @@ impl<F: RichField, H: Hasher<F>> IncrementalTree<F, H> {
 }
 
 
-fn main() {
+fn main() -> Result<()>{
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
@@ -183,75 +183,70 @@ fn main() {
     let (siblings, pos) = tree.witness(five_hash);
     println!("{:?}", tree.check_proof(five_hash, siblings.clone(), pos.clone()));
 
-    let mut targets: Vec<HashOutTarget> = Vec::new();
 
-    let node = builder.add_virtual_hash();
-    targets.push(node);
-
-    let root = builder.add_virtual_hash();
-    targets.push(root);
-
+    // Circuit 
+    let leaf = builder.add_virtual_hash();
+    let mut node = leaf;
     let siblings_t = builder.add_virtual_hashes(siblings.clone().len());
-
-    let mut next_hash: plonky2::hash::hash_types::HashOutTarget;
-
+    let root = builder.add_virtual_hash();
+    
     for (&p, &sibling) in pos.iter().zip(&siblings_t) {   
 
         if p {
-                    next_hash = builder.hash_or_noop::<PoseidonHash>([
+                    node = builder.hash_or_noop::<PoseidonHash>([
                         sibling.elements.to_vec(),
                         node.elements.to_vec()
                       ].concat());
                 } else {
-                    next_hash = builder.hash_or_noop::<PoseidonHash>([
+                    node = builder.hash_or_noop::<PoseidonHash>([
                         node.elements.to_vec(),
                         sibling.elements.to_vec()
                         ].concat());
     
                 }
+        
     }
-    
-    
-    
-    // pw.set_hash_target(leaf, five_hash);
+    builder.register_public_inputs(&leaf.elements);
+    builder.register_public_inputs(&node.elements);
 
-    let root_t = builder.add_virtual_hash();
-    pw.set_hash_target(root_t, tree.root);
+    for i in 0..4 {
+        builder.connect(root.elements[i], node.elements[i]);
+    }
 
-    let siblings_t = builder.add_virtual_hashes(siblings.clone().len());
-
+    pw.set_hash_target(leaf, five_hash);
     for i in 0..siblings.clone().len() {
-        pw.set_hash_target(siblings_t[i], siblings[i]);
+        pw.set_hash_target(siblings_t[i], *siblings.get(i).unwrap());
     }
+    pw.set_hash_target(root, tree.root());
 
-
-
-
+    let data = builder.build::<C>();
+    let proof = data.prove(pw)?;
+    
+    data.verify(proof)
 }
 
+// pub fn verify<F: RichField + Extendable<D>, H: AlgebraicHasher<F>, const D: usize>(
+//     builder: &mut CircuitBuilder<F, D>,
+//     pos: Vec<bool>,
+//     siblings: Vec<HashOutTarget>,
+//     root: HashOutTarget,
+//     leaf: HashOutTarget,
+// ) {
 
-pub fn verify<F: RichField + Extendable<D>, H: AlgebraicHasher<F>, const D: usize>(
-    builder: &mut CircuitBuilder<F, D>,
-    pos: Vec<bool>,
-    siblings: Vec<HashOutTarget>,
-    root: HashOutTarget,
-    leaf: HashOutTarget,
-) {
+//     let initial = builder.add_virtual_target();
 
-    let initial = builder.add_virtual_target();
+//     let mut node = leaf;
+//     for (&p, &sibling) in pos.iter().zip(&siblings) {   
 
-    let mut node = leaf;
-    for (&p, &sibling) in pos.iter().zip(&siblings) {   
+//         //  if p {
+//         //         node = builder.hash_or_noop([
+//         //             siblings.to_vec(),
+//         //             vec![node]
+//         //           ].concat());
+//         //     } else {
+//         //         node = H::two_to_one(node, *sibling);
 
-        //  if p {
-        //         node = builder.hash_or_noop([
-        //             siblings.to_vec(),
-        //             vec![node]
-        //           ].concat());
-        //     } else {
-        //         node = H::two_to_one(node, *sibling);
+//         //     }
+//         }
 
-        //     }
-        }
-
-    }
+//     }
