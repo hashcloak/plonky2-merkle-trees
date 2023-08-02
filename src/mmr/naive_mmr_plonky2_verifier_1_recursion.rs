@@ -3,7 +3,7 @@ use num::ToPrimitive;
 use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig, CommonCircuitData, VerifierCircuitTarget}, circuit_builder::CircuitBuilder, proof::ProofWithPublicInputsTarget}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
-use crate::mmr::{naive_merkle_mountain_ranges::get_standard_index, mmr_plonky2_verifier::{equal, or_list}};
+use crate::mmr::{naive_merkle_mountain_ranges::get_standard_index, naive_mmr_plonky2_verifier::{equal, or_list}};
 
 /** 
  * An mmr proof consists of 2 parts:
@@ -150,7 +150,7 @@ mod tests {
   use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
   use rand::Rng;
 
-  use crate::mmr::naive_merkle_mountain_ranges::MMR;
+  use crate::mmr::naive_merkle_mountain_ranges::naive_MMR;
 
   use super::{verify_inner_merkle_proof_circuit, complete_verification_circuit_with_inner_proof};
   const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
@@ -158,7 +158,7 @@ mod tests {
   pub fn do_test_verify_inner_proof(nr_leaves: usize, leaf_index: usize) -> Result<()> {
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
+    let mut mmr = naive_MMR::new(leaf0);
     for _ in 0..(nr_leaves-1) {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -205,7 +205,7 @@ mod tests {
   pub fn test_complete_verification_circuit_with_inner_proof(nr_leaves: usize, leaf_index: usize) -> Result<()> {
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
+    let mut mmr = naive_MMR::new(leaf0);
     for _ in 0..(nr_leaves-1) {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -292,7 +292,7 @@ mod tests {
     let leaf_index = 0;
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
+    let mut mmr = naive_MMR::new(leaf0);
     for _ in 0..(nr_leaves-1) {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -351,7 +351,7 @@ mod tests {
     let leaf_index = 0;
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
+    let mut mmr = naive_MMR::new(leaf0);
     for _ in 0..(nr_leaves-1) {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -411,7 +411,7 @@ mod tests {
     let leaf_index = 0;
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
+    let mut mmr = naive_MMR::new(leaf0);
     for _ in 0..(nr_leaves-1) {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }

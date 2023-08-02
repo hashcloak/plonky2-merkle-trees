@@ -18,7 +18,7 @@ use plonky2::plonk::config::Hasher;
 */
 
 #[derive(Debug, Clone)]
-pub struct MMR { // Merkle Mountain Ranges
+pub struct naive_MMR { // Merkle Mountain Ranges
   // holds values of all elements in mmr
   pub elements: Vec<HashOut<GoldilocksField>>, 
   // holds height for all elements in tree (0 is leaf). Indices line up with the elements vector
@@ -33,15 +33,15 @@ pub struct MMR { // Merkle Mountain Ranges
 
 // After bagging the peaks - in this form the MMR will have a single root 
 pub struct MMR_bagged {
-  pub mmr: MMR,
+  pub mmr: naive_MMR,
   pub root: HashOut<GoldilocksField>
 }
 
-impl MMR {
+impl naive_MMR {
   pub fn new(leaf: GoldilocksField) -> Self {
     let leaf_hash = PoseidonHash::hash_or_noop(&[leaf]);
 
-    MMR {
+    naive_MMR {
       elements: [leaf_hash].to_vec(),
       heights: [0].to_vec(),
       nr_leaves: 1,
@@ -234,7 +234,7 @@ impl MMR {
 // - height of subtree that leaf is part of
 // - index of that peak (in the MMR)
 // - index of start subtree (in the MMR)
-pub fn get_info_subtree_leaf_index(mmr: &MMR, leaf_index: usize) -> (u32, usize, usize) {
+pub fn get_info_subtree_leaf_index(mmr: &naive_MMR, leaf_index: usize) -> (u32, usize, usize) {
   // From the index, go to the right and decide where the highest peak is 
   //   (keep in mind that we know the height of highest peaks)
   let mut highest_peak_subtree: u32 = 0;
@@ -339,13 +339,13 @@ mod tests {
   use itertools::Itertools;
   use rand::Rng;
   use plonky2::{field::{goldilocks_field::GoldilocksField, types::Field}, hash::poseidon::PoseidonHash, plonk::config::Hasher};
-  use crate::mmr::naive_merkle_mountain_ranges::{MMR, get_merkle_proof, get_standard_index};
+  use crate::mmr::naive_merkle_mountain_ranges::{naive_MMR, get_merkle_proof, get_standard_index};
   const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
 
   #[test]
   fn test_tree_7_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+    let mut mmr = naive_MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     for _i in 0..6 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -361,7 +361,7 @@ mod tests {
   #[test]
   fn test_bagging_peaks_4_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+    let mut mmr = naive_MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     for _i in 0..3 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -376,7 +376,7 @@ mod tests {
   #[test]
   fn test_bagging_peaks_7_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+    let mut mmr = naive_MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     for _i in 0..6 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -394,7 +394,7 @@ mod tests {
   #[test]
   fn test_bagging_peaks_30_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+    let mut mmr = naive_MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     for _i in 0..30 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -411,7 +411,7 @@ mod tests {
   #[test]
   fn test_merkle_proof_subtree_index0() -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+    let mut mmr = naive_MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     for _i in 0..7 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -427,7 +427,7 @@ mod tests {
   #[test]
   fn test_merkle_proof_subtree_index8() -> Result<()> {
     let mut rng = rand::thread_rng();
-    let mut mmr = MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+    let mut mmr = naive_MMR::new(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     for _i in 0..7 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
@@ -444,14 +444,14 @@ mod tests {
   fn test_mmr_proof_tree_8_leaves() -> Result<()> {
     let mut rng = rand::thread_rng();
     let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
+    let mut mmr = naive_MMR::new(leaf0);
     for _i in 0..7 {
       mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
     }
     let mmr_bagged = mmr.clone().bagging_the_peaks();
     let pr = mmr.clone().get_proof(0);
 
-    let verified = MMR::verify_proof(0, leaf0, pr.0, pr.1, mmr_bagged.root);
+    let verified = naive_MMR::verify_proof(0, leaf0, pr.0, pr.1, mmr_bagged.root);
     assert!(verified);
     Ok(())
   }
@@ -559,7 +559,7 @@ mod tests {
     for _i in 0..8 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
-    let mut mmr = MMR::new(leaves[0]);
+    let mut mmr = naive_MMR::new(leaves[0]);
     for i in 1..8 {
       mmr.add_leaf(leaves[i]);  
     }
@@ -567,31 +567,31 @@ mod tests {
     let mmr_bagged = mmr.clone().bagging_the_peaks();
 
     let pr1 = mmr.clone().get_proof(1);
-    let verified1 = MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
+    let verified1 = naive_MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
 
     let pr2 = mmr.clone().get_proof(3);
     // Leaf index 3 in the MMR corresponds to the third leaf that was inserted
-    let verified2 = MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
+    let verified2 = naive_MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
 
     let pr3 = mmr.clone().get_proof(4);
     // Leaf index 4 in the MMR corresponds to the fourth leaf that was inserted
-    let verified3 = MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
+    let verified3 = naive_MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
 
     let pr4 = mmr.clone().get_proof(7);
     // Leaf index 7 in the MMR corresponds to the fifth leaf that was inserted
-    let verified4 = MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
+    let verified4 = naive_MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
 
     let pr5 = mmr.clone().get_proof(8);
     // Leaf index 8 in the MMR corresponds to the sixth leaf that was inserted
-    let verified5 = MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
+    let verified5 = naive_MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
 
     let pr6 = mmr.clone().get_proof(10);
     // Leaf index 10 in the MMR corresponds to the seventh leaf that was inserted
-    let verified6 = MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
+    let verified6 = naive_MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
 
     let pr7 = mmr.clone().get_proof(11);
     // Leaf index 11 in the MMR corresponds to the fifth leaf that was inserted
-    let verified7 = MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
+    let verified7 = naive_MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
 
     assert!(verified1 && verified2 && verified3 && verified4 && verified5 && verified6 && verified7);
     Ok(())
@@ -604,7 +604,7 @@ mod tests {
     for _i in 0..16 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
-    let mut mmr = MMR::new(leaves[0]);
+    let mut mmr = naive_MMR::new(leaves[0]);
     for i in 1..16 {
       mmr.add_leaf(leaves[i]);  
     }
@@ -612,58 +612,58 @@ mod tests {
     let mmr_bagged = mmr.clone().bagging_the_peaks();
 
     let pr0 = mmr.clone().get_proof(0);
-    let verified0 = MMR::verify_proof(0, leaves[0], pr0.0, pr0.1, mmr_bagged.root);
+    let verified0 = naive_MMR::verify_proof(0, leaves[0], pr0.0, pr0.1, mmr_bagged.root);
 
     let pr1 = mmr.clone().get_proof(1);
-    let verified1 = MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
+    let verified1 = naive_MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
 
     let pr2 = mmr.clone().get_proof(3);
     // Leaf index 3 in the MMR corresponds to the third leaf that was inserted
-    let verified2 = MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
+    let verified2 = naive_MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
 
     let pr3 = mmr.clone().get_proof(4);
     // Leaf index 4 in the MMR corresponds to the fourth leaf that was inserted
-    let verified3 = MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
+    let verified3 = naive_MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
 
     let pr4 = mmr.clone().get_proof(7);
     // Leaf index 7 in the MMR corresponds to the fifth leaf that was inserted
-    let verified4 = MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
+    let verified4 = naive_MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
 
     let pr5 = mmr.clone().get_proof(8);
     // Leaf index 8 in the MMR corresponds to the sixth leaf that was inserted
-    let verified5 = MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
+    let verified5 = naive_MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
 
     let pr6 = mmr.clone().get_proof(10);
     // Leaf index 10 in the MMR corresponds to the seventh leaf that was inserted
-    let verified6 = MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
+    let verified6 = naive_MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
 
     let pr7 = mmr.clone().get_proof(11);
     // Leaf index 11 in the MMR corresponds to the fifth leaf that was inserted
-    let verified7 = MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
+    let verified7 = naive_MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
 
     let pr8 = mmr.clone().get_proof(15);
-    let verified8 = MMR::verify_proof(15, leaves[8], pr8.0, pr8.1, mmr_bagged.root);
+    let verified8 = naive_MMR::verify_proof(15, leaves[8], pr8.0, pr8.1, mmr_bagged.root);
 
     let pr9 = mmr.clone().get_proof(16);
-    let verified9 = MMR::verify_proof(16, leaves[9], pr9.0, pr9.1, mmr_bagged.root);
+    let verified9 = naive_MMR::verify_proof(16, leaves[9], pr9.0, pr9.1, mmr_bagged.root);
 
     let pr10 = mmr.clone().get_proof(18);
-    let verified10 = MMR::verify_proof(18, leaves[10], pr10.0, pr10.1, mmr_bagged.root);
+    let verified10 = naive_MMR::verify_proof(18, leaves[10], pr10.0, pr10.1, mmr_bagged.root);
 
     let pr11 = mmr.clone().get_proof(19);
-    let verified11 = MMR::verify_proof(19, leaves[11], pr11.0, pr11.1, mmr_bagged.root);
+    let verified11 = naive_MMR::verify_proof(19, leaves[11], pr11.0, pr11.1, mmr_bagged.root);
 
     let pr12 = mmr.clone().get_proof(22);
-    let verified12 = MMR::verify_proof(22, leaves[12], pr12.0, pr12.1, mmr_bagged.root);
+    let verified12 = naive_MMR::verify_proof(22, leaves[12], pr12.0, pr12.1, mmr_bagged.root);
 
     let pr13 = mmr.clone().get_proof(23);
-    let verified13 = MMR::verify_proof(23, leaves[13], pr13.0, pr13.1, mmr_bagged.root);
+    let verified13 = naive_MMR::verify_proof(23, leaves[13], pr13.0, pr13.1, mmr_bagged.root);
 
     let pr14 = mmr.clone().get_proof(25);
-    let verified14 = MMR::verify_proof(25, leaves[14], pr14.0, pr14.1, mmr_bagged.root);
+    let verified14 = naive_MMR::verify_proof(25, leaves[14], pr14.0, pr14.1, mmr_bagged.root);
 
     let pr15 = mmr.clone().get_proof(26);
-    let verified15 = MMR::verify_proof(26, leaves[15], pr15.0, pr15.1, mmr_bagged.root);
+    let verified15 = naive_MMR::verify_proof(26, leaves[15], pr15.0, pr15.1, mmr_bagged.root);
 
     assert!(verified0 && verified1 && verified2 && verified3 && verified4 && verified5 && verified6 && verified7);
     assert!(verified8 && verified9 && verified10 && verified11 && verified12 && verified13 && verified14 && verified15);
@@ -677,7 +677,7 @@ mod tests {
     for _i in 0..18 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
-    let mut mmr = MMR::new(leaves[0]);
+    let mut mmr = naive_MMR::new(leaves[0]);
     for i in 1..18 {
       mmr.add_leaf(leaves[i]);  
     }
@@ -685,55 +685,55 @@ mod tests {
     let mmr_bagged = mmr.clone().bagging_the_peaks();
 
     let pr0 = mmr.clone().get_proof(0);
-    let verified0 = MMR::verify_proof(0, leaves[0], pr0.0, pr0.1, mmr_bagged.root);
+    let verified0 = naive_MMR::verify_proof(0, leaves[0], pr0.0, pr0.1, mmr_bagged.root);
 
     let pr1 = mmr.clone().get_proof(1);
-    let verified1 = MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
+    let verified1 = naive_MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
 
     let pr2 = mmr.clone().get_proof(3);
-    let verified2 = MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
+    let verified2 = naive_MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
 
     let pr3 = mmr.clone().get_proof(4);
-    let verified3 = MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
+    let verified3 = naive_MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
 
     let pr4 = mmr.clone().get_proof(7);
-    let verified4 = MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
+    let verified4 = naive_MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
 
     let pr5 = mmr.clone().get_proof(8);
-    let verified5 = MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
+    let verified5 = naive_MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
 
     let pr6 = mmr.clone().get_proof(10);
-    let verified6 = MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
+    let verified6 = naive_MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
 
     let pr7 = mmr.clone().get_proof(11);
-    let verified7 = MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
+    let verified7 = naive_MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
 
     let pr8 = mmr.clone().get_proof(15);
-    let verified8 = MMR::verify_proof(15, leaves[8], pr8.0, pr8.1, mmr_bagged.root);
+    let verified8 = naive_MMR::verify_proof(15, leaves[8], pr8.0, pr8.1, mmr_bagged.root);
 
     let pr9 = mmr.clone().get_proof(16);
-    let verified9 = MMR::verify_proof(16, leaves[9], pr9.0, pr9.1, mmr_bagged.root);
+    let verified9 = naive_MMR::verify_proof(16, leaves[9], pr9.0, pr9.1, mmr_bagged.root);
 
     let pr10 = mmr.clone().get_proof(18);
-    let verified10 = MMR::verify_proof(18, leaves[10], pr10.0, pr10.1, mmr_bagged.root);
+    let verified10 = naive_MMR::verify_proof(18, leaves[10], pr10.0, pr10.1, mmr_bagged.root);
 
     let pr11 = mmr.clone().get_proof(19);
-    let verified11 = MMR::verify_proof(19, leaves[11], pr11.0, pr11.1, mmr_bagged.root);
+    let verified11 = naive_MMR::verify_proof(19, leaves[11], pr11.0, pr11.1, mmr_bagged.root);
 
     let pr12 = mmr.clone().get_proof(22);
-    let verified12 = MMR::verify_proof(22, leaves[12], pr12.0, pr12.1, mmr_bagged.root);
+    let verified12 = naive_MMR::verify_proof(22, leaves[12], pr12.0, pr12.1, mmr_bagged.root);
 
     let pr13 = mmr.clone().get_proof(23);
-    let verified13 = MMR::verify_proof(23, leaves[13], pr13.0, pr13.1, mmr_bagged.root);
+    let verified13 = naive_MMR::verify_proof(23, leaves[13], pr13.0, pr13.1, mmr_bagged.root);
 
     let pr14 = mmr.clone().get_proof(25);
-    let verified14 = MMR::verify_proof(25, leaves[14], pr14.0, pr14.1, mmr_bagged.root);
+    let verified14 = naive_MMR::verify_proof(25, leaves[14], pr14.0, pr14.1, mmr_bagged.root);
 
     let pr15 = mmr.clone().get_proof(26);
-    let verified15 = MMR::verify_proof(26, leaves[15], pr15.0, pr15.1, mmr_bagged.root);
+    let verified15 = naive_MMR::verify_proof(26, leaves[15], pr15.0, pr15.1, mmr_bagged.root);
 
     let pr16: (Vec<plonky2::hash::hash_types::HashOut<GoldilocksField>>, Vec<plonky2::hash::hash_types::HashOut<GoldilocksField>>, usize) = mmr.clone().get_proof(31);
-    let verified16 = MMR::verify_proof(pr16.2, leaves[16], pr16.0, pr16.1, mmr_bagged.root);
+    let verified16 = naive_MMR::verify_proof(pr16.2, leaves[16], pr16.0, pr16.1, mmr_bagged.root);
 
     assert!(verified0 && verified1 && verified2 && verified3 && verified4 && verified5 && verified6 && verified7);
     assert!(verified8 && verified9 && verified10 && verified11 && verified12 && verified13 && verified14 && verified15);
@@ -748,7 +748,7 @@ mod tests {
     for _i in 0..22 {
       leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
     }
-    let mut mmr = MMR::new(leaves[0]);
+    let mut mmr = naive_MMR::new(leaves[0]);
     for i in 1..22 {
       mmr.add_leaf(leaves[i]);  
     }
@@ -756,67 +756,67 @@ mod tests {
     let mmr_bagged = mmr.clone().bagging_the_peaks();
 
     let pr0 = mmr.clone().get_proof(0);
-    let verified0 = MMR::verify_proof(0, leaves[0], pr0.clone().0, pr0.clone().1, mmr_bagged.root);
+    let verified0 = naive_MMR::verify_proof(0, leaves[0], pr0.clone().0, pr0.clone().1, mmr_bagged.root);
 
     let pr1 = mmr.clone().get_proof(1);
-    let verified1 = MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
+    let verified1 = naive_MMR::verify_proof(1, leaves[1], pr1.0, pr1.1, mmr_bagged.root);
 
     let pr2 = mmr.clone().get_proof(3);
-    let verified2 = MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
+    let verified2 = naive_MMR::verify_proof(3, leaves[2], pr2.0, pr2.1, mmr_bagged.root);
 
     let pr3 = mmr.clone().get_proof(4);
-    let verified3 = MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
+    let verified3 = naive_MMR::verify_proof(4, leaves[3], pr3.0, pr3.1, mmr_bagged.root);
 
     let pr4 = mmr.clone().get_proof(7);
-    let verified4 = MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
+    let verified4 = naive_MMR::verify_proof(7, leaves[4], pr4.0, pr4.1, mmr_bagged.root);
 
     let pr5 = mmr.clone().get_proof(8);
-    let verified5 = MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
+    let verified5 = naive_MMR::verify_proof(8, leaves[5], pr5.0, pr5.1, mmr_bagged.root);
 
     let pr6 = mmr.clone().get_proof(10);
-    let verified6 = MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
+    let verified6 = naive_MMR::verify_proof(10, leaves[6], pr6.0, pr6.1, mmr_bagged.root);
 
     let pr7 = mmr.clone().get_proof(11);
-    let verified7 = MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
+    let verified7 = naive_MMR::verify_proof(11, leaves[7], pr7.0, pr7.1, mmr_bagged.root);
 
     let pr8 = mmr.clone().get_proof(15);
-    let verified8 = MMR::verify_proof(15, leaves[8], pr8.0, pr8.1, mmr_bagged.root);
+    let verified8 = naive_MMR::verify_proof(15, leaves[8], pr8.0, pr8.1, mmr_bagged.root);
 
     let pr9 = mmr.clone().get_proof(16);
-    let verified9 = MMR::verify_proof(16, leaves[9], pr9.0, pr9.1, mmr_bagged.root);
+    let verified9 = naive_MMR::verify_proof(16, leaves[9], pr9.0, pr9.1, mmr_bagged.root);
 
     let pr10 = mmr.clone().get_proof(18);
-    let verified10 = MMR::verify_proof(18, leaves[10], pr10.0, pr10.1, mmr_bagged.root);
+    let verified10 = naive_MMR::verify_proof(18, leaves[10], pr10.0, pr10.1, mmr_bagged.root);
 
     let pr11 = mmr.clone().get_proof(19);
-    let verified11 = MMR::verify_proof(19, leaves[11], pr11.0, pr11.1, mmr_bagged.root);
+    let verified11 = naive_MMR::verify_proof(19, leaves[11], pr11.0, pr11.1, mmr_bagged.root);
 
     let pr12 = mmr.clone().get_proof(22);
-    let verified12 = MMR::verify_proof(22, leaves[12], pr12.0, pr12.1, mmr_bagged.root);
+    let verified12 = naive_MMR::verify_proof(22, leaves[12], pr12.0, pr12.1, mmr_bagged.root);
 
     let pr13 = mmr.clone().get_proof(23);
-    let verified13 = MMR::verify_proof(23, leaves[13], pr13.0, pr13.1, mmr_bagged.root);
+    let verified13 = naive_MMR::verify_proof(23, leaves[13], pr13.0, pr13.1, mmr_bagged.root);
 
     let pr14 = mmr.clone().get_proof(25);
-    let verified14 = MMR::verify_proof(25, leaves[14], pr14.0, pr14.1, mmr_bagged.root);
+    let verified14 = naive_MMR::verify_proof(25, leaves[14], pr14.0, pr14.1, mmr_bagged.root);
 
     let pr15 = mmr.clone().get_proof(26);
-    let verified15 = MMR::verify_proof(26, leaves[15], pr15.0, pr15.1, mmr_bagged.root);
+    let verified15 = naive_MMR::verify_proof(26, leaves[15], pr15.0, pr15.1, mmr_bagged.root);
 
     let pr16 = mmr.clone().get_proof(31);
-    let verified16 = MMR::verify_proof(pr16.2, leaves[16], pr16.0, pr16.1, mmr_bagged.root);
+    let verified16 = naive_MMR::verify_proof(pr16.2, leaves[16], pr16.0, pr16.1, mmr_bagged.root);
  
     let pr17 = mmr.clone().get_proof(32);
-    let verified17 = MMR::verify_proof(pr17.2, leaves[17], pr17.0, pr17.1, mmr_bagged.root);
+    let verified17 = naive_MMR::verify_proof(pr17.2, leaves[17], pr17.0, pr17.1, mmr_bagged.root);
   
     let pr18 = mmr.clone().get_proof(34);
-    let verified18 = MMR::verify_proof(pr18.2, leaves[18], pr18.0, pr18.1, mmr_bagged.root);
+    let verified18 = naive_MMR::verify_proof(pr18.2, leaves[18], pr18.0, pr18.1, mmr_bagged.root);
    
     let pr19 = mmr.clone().get_proof(35);
-    let verified19 = MMR::verify_proof(pr19.2, leaves[19], pr19.0, pr19.1, mmr_bagged.root);
+    let verified19 = naive_MMR::verify_proof(pr19.2, leaves[19], pr19.0, pr19.1, mmr_bagged.root);
 
     let pr20 = mmr.clone().get_proof(38);
-    let verified20 = MMR::verify_proof(pr20.2, leaves[20], pr20.0, pr20.1, mmr_bagged.root);
+    let verified20 = naive_MMR::verify_proof(pr20.2, leaves[20], pr20.0, pr20.1, mmr_bagged.root);
  
     assert!(verified0 && verified1 && verified2 && verified3 && verified4 && verified5 && verified6 && verified7);
     assert!(verified8 && verified9 && verified10 && verified11 && verified12 && verified13 && verified14 && verified15);

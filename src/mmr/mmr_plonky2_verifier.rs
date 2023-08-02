@@ -1,16 +1,35 @@
 use itertools::Itertools;
-use num::ToPrimitive;
-use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig}, circuit_builder::CircuitBuilder}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
+use plonky2::{hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig}, circuit_builder::CircuitBuilder}, iop::target::{BoolTarget, Target}};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
-use crate::mmr::naive_merkle_mountain_ranges::get_standard_index;
+// TODO add these functions to utils or common file
 
-// Returns a circuit that verifies an mmr proof, and the targets that need to be set in the witness
+use crate::mmr::naive_mmr_plonky2_verifier::{equal, or_list};
+
+pub fn pick_hash(
+  builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
+  option1: HashOutTarget, 
+  option2: HashOutTarget, 
+  pick_left: BoolTarget) -> HashOutTarget {
+    let opposite = builder.not(pick_left);
+
+    let t0 = builder.mul(option2.elements[0], opposite.target);
+    let t1 = builder.mul(option2.elements[1], opposite.target);
+    let t2 = builder.mul(option2.elements[2], opposite.target);
+    let t3 = builder.mul(option2.elements[3], opposite.target);
+    let hash_elm0 = builder.mul_add(option1.elements[0], pick_left.target,  t0);
+    let hash_elm1 = builder.mul_add(option1.elements[1], pick_left.target, t1);
+    let hash_elm2 = builder.mul_add(option1.elements[2], pick_left.target, t2);
+    let hash_elm3 = builder.mul_add(option1.elements[3], pick_left.target, t3);
+    HashOutTarget { elements: [hash_elm0, hash_elm1, hash_elm2, hash_elm3] }
+  }
+
+
 pub fn verify_mmr_proof_circuit(
-  relative_leaf_index: usize, // index of leaf within subtree. This is an MMR index
-  nr_proof_elms: usize, // nr of layers within subtree
-  nr_peaks: usize // peaks in MMR
-) -> (CircuitData<GoldilocksField, PoseidonGoldilocksConfig, 2>, Vec<HashOutTarget>) {
+  nr_merkle_proof_elms: usize,
+  nr_peaks: usize
+  // Returns circuit data, targets for leaf, targets for proof elements (hashes), targets for peaks
+) -> (CircuitData<GoldilocksField, PoseidonGoldilocksConfig, 2>, Target, Vec<(HashOutTarget, BoolTarget)>, Vec<HashOutTarget>) {
   // 1. Hashes its way through the (public input) merkle proof elements
   // 2. Check result of (1) is amongst peaks
   //     (for this, compare it to all peaks and check that the OR of these comparisons together true)
@@ -20,49 +39,38 @@ pub fn verify_mmr_proof_circuit(
   type C = PoseidonGoldilocksConfig;
   type F = <C as GenericConfig<D>>::F;
 
-  let mut targets: Vec<HashOutTarget> = Vec::new();
+  let mut proof_targets: Vec<(HashOutTarget, BoolTarget)> = Vec::new();
+  let mut peak_targets: Vec<HashOutTarget> = Vec::new();
 
   let config = CircuitConfig::standard_recursion_config();
   let mut builder: CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2> = CircuitBuilder::<F, D>::new(config);
   // The leaf to prove is in the MMR
-  let leaf_to_prove = builder.add_virtual_hash();
-  targets.push(leaf_to_prove);
+  let leaf_to_prove = builder.add_virtual_target();
+  let hashed_leaf = builder.hash_or_noop::<PoseidonHash>([leaf_to_prove].to_vec());
+  
   // The first hashing outside of the loop, since it uses the leaf_to_prove
-  let merkle_proof_elm = builder.add_virtual_hash();
-  targets.push(merkle_proof_elm);
-  let mut next_hash: plonky2::hash::hash_types::HashOutTarget;
+  let mut next_hash: plonky2::hash::hash_types::HashOutTarget = hashed_leaf;
 
-  let nr_leaves_subtree = 2i32.pow(nr_proof_elms.to_u32().unwrap()).to_usize().unwrap();
-  let standardized_index = get_standard_index(relative_leaf_index, nr_leaves_subtree);
-
-  if standardized_index % 2 == 0 {
-    next_hash = builder.hash_or_noop::<PoseidonHash>([
-      leaf_to_prove.elements.to_vec(), 
+  let mut proof_elm_index = 0;
+  while proof_elm_index < nr_merkle_proof_elms {
+    let merkle_proof_elm = builder.add_virtual_hash();
+    let elm_on_left = builder.add_virtual_bool_target_safe();
+    proof_targets.push((merkle_proof_elm, elm_on_left));
+    // Create the 2 options and then chose the correct one
+    // Option 1: sibling on the left
+    let option1 = builder.hash_or_noop::<PoseidonHash>([
+      merkle_proof_elm.elements.to_vec(),
+      next_hash.elements.to_vec()
+    ].concat());
+    // Option 2: sibling on the right
+    let option2 = builder.hash_or_noop::<PoseidonHash>([
+      next_hash.elements.to_vec(),
       merkle_proof_elm.elements.to_vec()
     ].concat());
-  } else {
-    next_hash = builder.hash_or_noop::<PoseidonHash>([
-      merkle_proof_elm.elements.to_vec(),
-      leaf_to_prove.elements.to_vec()
-    ].concat());
-  }
-  let mut current_layer_index = standardized_index / 2;
-  for _layer in 1..nr_proof_elms {
-    let merkle_proof_elm= builder.add_virtual_hash();
-    targets.push(merkle_proof_elm);
 
-    if current_layer_index % 2 == 0 {
-      next_hash = builder.hash_or_noop::<PoseidonHash>([
-        next_hash.elements.to_vec(), 
-        merkle_proof_elm.elements.to_vec()
-      ].concat());
-    } else {
-      next_hash = builder.hash_or_noop::<PoseidonHash>([
-        merkle_proof_elm.elements.to_vec(),
-        next_hash.elements.to_vec()
-      ].concat());
-    }
-    current_layer_index = current_layer_index/2;
+    // Pick the right next hash according to the bool that has been given with this element
+    next_hash = pick_hash(&mut builder, option1, option2, elm_on_left);
+    proof_elm_index += 1;
   }
 
   // Hash all peaks together
@@ -71,7 +79,7 @@ pub fn verify_mmr_proof_circuit(
   for _peaks in 0..nr_peaks {
     let peak = builder.add_virtual_hash();
     peaks.push(peak);
-    targets.push(peak);
+    peak_targets.push(peak);
     let equals_peak: BoolTarget = equal(&mut builder, peak, next_hash);
     equals.push(equals_peak);
   }
@@ -94,399 +102,126 @@ pub fn verify_mmr_proof_circuit(
   }
 
   let data = builder.build::<C>();
-  (data, targets)
+  (data, leaf_to_prove, proof_targets, peak_targets)
 }
-
-pub fn equal(
-  builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
-  first: HashOutTarget, 
-  second: HashOutTarget) -> BoolTarget {
-  let elm0 = builder.is_equal(first.elements[0], second.elements[0]);
-  let elm1 = builder.is_equal(first.elements[1], second.elements[1]);
-  let elm2 = builder.is_equal(first.elements[2], second.elements[2]);
-  let elm3 = builder.is_equal(first.elements[3], second.elements[3]);
-  let elm0_or_elm1 = builder.or(elm0, elm1);
-  let elm2_or_elm3 = builder.or(elm2, elm3);
-  builder.or(elm0_or_elm1, elm2_or_elm3)
-}
-
-pub fn or_list(
-  builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
-  ins: Vec<BoolTarget>) -> BoolTarget {
-    assert!(ins.len() > 0 );
-    if ins.len() == 1 {
-      return ins[0];
-    } else if ins.len() == 2 {
-      return builder.or(ins[0], ins[1]); 
-    } else {
-      let mut pairs: Vec<BoolTarget> = Vec::new();
-      for pair in ins.chunks(2) {
-        if pair.len() > 1 {
-          pairs.push(builder.or(pair[0], pair[1]));
-        } else {
-          pairs.push(pair[0]);
-        }
-        
-      }
-      return or_list(builder, pairs);
-    }
-  }
 
 #[cfg(test)]
 mod tests {
   use anyhow::Result;
-  use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
-  use plonky2::{iop::witness::WitnessWrite, plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::CircuitConfig, circuit_builder::CircuitBuilder}};
-  use rand::Rng;
+use num::ToPrimitive;
+use plonky2::{iop::witness::WitnessWrite, plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, circuit_data::CircuitConfig, circuit_builder::CircuitBuilder}, hash::{hash_types::HashOutTarget, poseidon::PoseidonHash}};
+use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
+use rand::Rng;
 
-  use crate::mmr::{naive_merkle_mountain_ranges::MMR, mmr_plonky2_verifier::or_list};
-
-  use super::verify_mmr_proof_circuit;
+use crate::mmr::{merkle_mountain_ranges::{MMR, get_mmr_index}, mmr_plonky2_verifier::verify_mmr_proof_circuit};
   const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
 
-  #[test]
-  fn test_or_list_result_true() -> Result<()> {
+  fn test_mmr_verifier(nr_leaves: usize, leaf_normal_index: usize) -> Result<()> {
+    let leaf_mmr_index: usize = get_mmr_index(leaf_normal_index);
     
-    const D: usize = 2;
-    type C = PoseidonGoldilocksConfig;
-    type F = <C as GenericConfig<D>>::F;
-
-    let config = CircuitConfig::standard_recursion_config();
-    let mut builder: CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2> = CircuitBuilder::<F, D>::new(config);
-    let b0 = builder.add_virtual_bool_target_safe();
-    let b1 = builder.add_virtual_bool_target_safe();
-    let b2 = builder.add_virtual_bool_target_safe();
-    let b3 = or_list(&mut builder, [b0,b1,b2].to_vec());
-
-    
-    let one: plonky2::iop::target::Target = builder.one();
-    builder.connect(one, b3.target); // this is how we can test for true /false. Somehow assert_bool doesn't work
-    let circuit_data = builder.build();
-
-    // false true false
-    let mut pw1 = plonky2::iop::witness::PartialWitness::new();
-    pw1.set_bool_target(b0, false);
-    pw1.set_bool_target(b1, true);
-    pw1.set_bool_target(b2, false);
-
-    let proof1: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-    circuit_data.prove(pw1)?;
-
-    circuit_data.verify(proof1);
-
-    // true true true
-    let mut pw2 = plonky2::iop::witness::PartialWitness::new();
-    pw2.set_bool_target(b0, true);
-    pw2.set_bool_target(b1, true);
-    pw2.set_bool_target(b2, true);
-
-    let proof2: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-    circuit_data.prove(pw2)?;
-
-    circuit_data.verify(proof2)
-  }
-
-  #[test]
-  fn test_or_list_result_false() -> Result<()> {
-    
-    const D: usize = 2;
-    type C = PoseidonGoldilocksConfig;
-    type F = <C as GenericConfig<D>>::F;
-
-    let config = CircuitConfig::standard_recursion_config();
-    let mut builder: CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2> = CircuitBuilder::<F, D>::new(config);
-    let b0 = builder.add_virtual_bool_target_safe();
-    let b1 = builder.add_virtual_bool_target_safe();
-    let b2 = builder.add_virtual_bool_target_safe();
-    let b3 = builder.add_virtual_bool_target_safe();
-    let b4 = or_list(&mut builder, [b0,b1,b2,b3].to_vec());
-    
-    let zero: plonky2::iop::target::Target = builder.zero();
-    builder.connect(zero, b4.target); // this is how we can test for true /false. Somehow assert_bool doesn't work
-    let circuit_data = builder.build();
-
-    // false false false false
-    let mut pw1 = plonky2::iop::witness::PartialWitness::new();
-    pw1.set_bool_target(b0, false);
-    pw1.set_bool_target(b1, false);
-    pw1.set_bool_target(b2, false);
-    pw1.set_bool_target(b3, false);
-
-    let proof1: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-    circuit_data.prove(pw1)?;
-
-    circuit_data.verify(proof1)
-  }
-
-  pub fn do_test_verify_proof(nr_leaves: usize, leaf_index: usize) -> Result<()> {
     let mut rng = rand::thread_rng();
-    let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
-    for _ in 0..(nr_leaves-1) {
-      mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
+    let mut leaves = Vec::new();
+    
+    let mut mmr = MMR::new();
+    for i in 0..nr_leaves {
+      leaves.push(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));
+      mmr.add_leaf(leaves[i]);  
     }
-    let mmr_bagged = mmr.clone().bagging_the_peaks();
-    let pr = mmr.clone().get_proof(leaf_index);
+    let pr = mmr.clone().get_proof(leaf_mmr_index);
 
-    let (circuit_data, targets) = verify_mmr_proof_circuit(
-      pr.2,
-      pr.0.len(),
-      pr.1.len()
-    );
+    // Checking that the proof is valid
+    let root = mmr.bagging_the_peaks();
+    assert!(pr.clone().verify(leaves[leaf_normal_index], root));
 
+    let (circuit_data, 
+      leaf_target, 
+      proof_elms_targets, 
+      peak_targets) =
+      verify_mmr_proof_circuit(pr.clone().merkle_proof.len(), pr.clone().peaks.len());
+
+    // Create witness
     let mut pw = plonky2::iop::witness::PartialWitness::new();
-    pw.set_hash_target(targets[0], mmr.elements[leaf_index]); // hashed leaf to prove
-    // Add all proof elements
-    for i in 0..pr.0.len() {
-      pw.set_hash_target(targets[1 + i], pr.0[i]);
+
+    // Leaf to be proved
+    pw.set_target(leaf_target, leaves[leaf_normal_index]);
+    
+    // Merkle proof hashes, along with the indication whether the hash is on the left
+    for i in 0..pr.merkle_proof.len() {
+      pw.set_hash_target(proof_elms_targets[i].0, pr.merkle_proof[i].0);
+      pw.set_bool_target(proof_elms_targets[i].1, pr.merkle_proof[i].1);
     }
+
     // Add all peaks
-    for i in 0..pr.1.len() {
-      pw.set_hash_target(targets[pr.0.len() + 1 + i], pr.1[i]);
+    for i in 0..pr.peaks.len() {
+      pw.set_hash_target(peak_targets[i], pr.peaks[i]);
     }
     
+    // Set the public inputs; leaf and root
     let expected_public_inputs = circuit_data.prover_only.public_inputs.clone();
     for i in 0..4 {
-      pw.set_target(expected_public_inputs[i], mmr_bagged.root.elements[i]);
+      pw.set_target(expected_public_inputs[i], root.elements[i]);
     }
     let proof: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-      circuit_data.prove(pw)?;
+      circuit_data.prove(pw).unwrap();
 
     circuit_data.verify(proof)
-
   }
 
   #[test]
-  fn verify_proof_2_leaves_index1() -> Result<()> {
-    do_test_verify_proof(2, 1)
-  }
-
-  #[test]
-  fn verify_proof_4_leaves_index0() -> Result<()> {
-    do_test_verify_proof(4, 0)
-  }
-
-  #[test]
-  fn verify_proof_4_leaves_index1() -> Result<()> {
-    do_test_verify_proof(4, 1)
+  fn test_mmr_verifier_3leaves() -> Result<()> {
+    let nr_leaves: usize = 3;
+    for i in 0..nr_leaves {
+      _ = test_mmr_verifier(nr_leaves,i);  
+    }
+    Ok(())
   }
   
   #[test]
-  fn verify_proof_4_leaves_index3() -> Result<()> {
-    do_test_verify_proof(4, 3)
+  fn test_mmr_verifier_7leaves() -> Result<()> {
+    let nr_leaves: usize = 7;
+    for i in 0..nr_leaves {
+      _ = test_mmr_verifier(nr_leaves,i);  
+    }
+    Ok(())
+  }
+    
+  #[test]
+  fn test_mmr_verifier_70leaves() -> Result<()> {
+    let nr_leaves: usize = 70;
+    for i in 0..nr_leaves {
+      _ = test_mmr_verifier(nr_leaves,i);  
+    }
+    Ok(())
+  }
+    
+  #[test]
+  fn test_mmr_verifier_31leaves() -> Result<()> {
+    let nr_leaves: usize = 31;
+    for i in 0..nr_leaves {
+      _ = test_mmr_verifier(nr_leaves,i);  
+    }
+    Ok(())
   }
 
   #[test]
-  fn verify_proof_4_leaves_index4() -> Result<()> {
-    do_test_verify_proof(4, 4)
-  }
-
-  #[test]
-  fn verify_proof_5_leaves_index3() -> Result<()> {
-    do_test_verify_proof(5, 3)
-  }
-
-  #[test]
-  fn verify_proof_6_leaves_index3() -> Result<()> {
-    do_test_verify_proof(6, 3)
-  }
-
-  #[test]
-  fn verify_proof_10_leaves_index15() -> Result<()> {
-    do_test_verify_proof(10, 15)
-  }
-
-  #[test]
-  fn verify_proof_12_leaves_index16() -> Result<()> {
-    do_test_verify_proof(12, 16)
-  }
-
-  #[test]
-  fn verify_proof_16_leaves_index3() -> Result<()> {
-    do_test_verify_proof(16, 3)
-  }
-
-  #[test]
-  fn verify_proof_16_leaves_index8() -> Result<()> {
-    do_test_verify_proof(16, 8)
-  }
-
-  #[test]
-  fn verify_proof_16_leaves_index25() -> Result<()> {
-    do_test_verify_proof(16, 25)
-  }
-
-  #[test]
-  fn verify_proof_101_leaves_index25() -> Result<()> {
-    do_test_verify_proof(101, 25)
-  }
-
-  #[test]
-  fn verify_proof_1001_leaves_index25() -> Result<()> {
-    do_test_verify_proof(1001, 25)
-  }
-
-  #[test]
-  fn verify_proof_32_leaves_index56() -> Result<()> {
-    do_test_verify_proof(32, 56)
+  fn test_mmr_verifier_multiple_sizes_1() -> Result<()> {
+    for nr_leaves in 6..16 {
+      for i in 0..nr_leaves {
+        _ = test_mmr_verifier(nr_leaves,i);  
+      }
+    }
+    
+    Ok(())
   }
   
-  #[test]
-  fn verify_proof_1001_leaves_index56() -> Result<()> {
-    do_test_verify_proof(10101, 56)
-  }
-
-  fn test_wrong_proof(nr_leaves: usize, leaf_index: usize, wrong_leaf: usize) {
-    // let nr_leaves: usize = 1001;
-    // let leaf_index: usize = 25;
-
-    let mut rng = rand::thread_rng();
-    let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
-    for _ in 0..(nr_leaves-1) {
-      mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
-    }
-    let mmr_bagged = mmr.clone().bagging_the_peaks();
-    let pr = mmr.clone().get_proof(leaf_index);
-
-    let (circuit_data, targets) = verify_mmr_proof_circuit(
-      pr.2,
-      pr.0.len(),
-      pr.1.len()
-    );
-
-    let mut pw = plonky2::iop::witness::PartialWitness::new();
-    // WRONG LEAF
-    pw.set_hash_target(targets[0], mmr.elements[wrong_leaf]);
-    // Add all proof elements
-    for i in 0..pr.0.len() {
-      pw.set_hash_target(targets[1 + i], pr.0[i]);
-    }
-    // Add all peaks
-    for i in 0..pr.1.len() {
-      pw.set_hash_target(targets[pr.0.len() + 1 + i], pr.1[i]);
+    #[test]
+  fn test_mmr_verifier_multiple_sizes_2() -> Result<()> {
+    for nr_leaves in 0..40 {
+      for i in 0..nr_leaves {
+        _ = test_mmr_verifier(nr_leaves,i);  
+      }
     }
     
-    let expected_public_inputs = circuit_data.prover_only.public_inputs.clone();
-    for i in 0..4 {
-      pw.set_target(expected_public_inputs[i], mmr_bagged.root.elements[i]);
-    }
-    let proof: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-      circuit_data.prove(pw).unwrap();
-
-    circuit_data.verify(proof);
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_wrong_proof1() {
-    test_wrong_proof(1001,25, 1);
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_wrong_proof2() {
-    test_wrong_proof(16,10, 11);
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_wrong_proof3() {
-    test_wrong_proof(32,25, 23);
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_wrong_proof4() {
-    test_wrong_proof(100100,1, 0);
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_wrong_root() {
-    let nr_leaves: usize = 32;
-    let leaf_index: usize = 0;
-
-    let mut rng = rand::thread_rng();
-    let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
-    for _ in 0..(nr_leaves-1) {
-      mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
-    }
-    let mmr_bagged = mmr.clone().bagging_the_peaks();
-    let pr = mmr.clone().get_proof(leaf_index);
-
-    let (circuit_data, targets) = verify_mmr_proof_circuit(
-      pr.2,
-      pr.0.len(),
-      pr.1.len()
-    );
-
-    let mut pw = plonky2::iop::witness::PartialWitness::new();
-    
-    pw.set_hash_target(targets[0], mmr.elements[0]);
-    // Add all proof elements
-    for i in 0..pr.0.len() {
-      pw.set_hash_target(targets[1 + i], pr.0[i]);
-    }
-    // Add all peaks
-    for i in 0..pr.1.len() {
-      pw.set_hash_target(targets[pr.0.len() + 1 + i], pr.1[i]);
-    }
-    
-    let expected_public_inputs = circuit_data.prover_only.public_inputs.clone();
-    for i in 0..4 {
-      // WRONG ROOT 
-      pw.set_target(expected_public_inputs[i], mmr_bagged.root.elements[0]);
-    }
-    let proof: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-      circuit_data.prove(pw).unwrap();
-
-    circuit_data.verify(proof);
-
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_wrong_peaks() {
-    let nr_leaves: usize = 10101;
-    let leaf_index: usize = 0;
-
-    let mut rng = rand::thread_rng();
-    let leaf0 = GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER));
-    let mut mmr = MMR::new(leaf0);
-    for _ in 0..(nr_leaves-1) {
-      mmr.add_leaf(GoldilocksField::from_canonical_u64(rng.gen_range(0..GOLDILOCKS_FIELD_ORDER)));  
-    }
-    let mmr_bagged = mmr.clone().bagging_the_peaks();
-    let pr = mmr.clone().get_proof(leaf_index);
-
-    let (circuit_data, targets) = verify_mmr_proof_circuit(
-      pr.2,
-      pr.0.len(),
-      pr.1.len()
-    );
-
-    let mut pw = plonky2::iop::witness::PartialWitness::new();
-    
-    pw.set_hash_target(targets[0], mmr.elements[0]);
-    // Add all proof elements
-    for i in 0..pr.0.len() {
-      pw.set_hash_target(targets[1 + i], pr.0[i]);
-    }
-    // Add all peaks
-    for i in 0..pr.1.len() {
-      pw.set_hash_target(targets[pr.0.len() + 1 + i], pr.1[0]);
-    }
-    
-    let expected_public_inputs = circuit_data.prover_only.public_inputs.clone();
-    for i in 0..4 {
-      pw.set_target(expected_public_inputs[i], mmr_bagged.root.elements[i]);
-    }
-    let proof: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-      circuit_data.prove(pw).unwrap();
-
-    circuit_data.verify(proof);
-
+    Ok(())
   }
 }
