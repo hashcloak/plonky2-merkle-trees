@@ -310,9 +310,14 @@ mod tests {
         }
         pw.set_hash_target(root_t, tree.root());
 
+        builder.register_public_inputs(&root_t.elements);
+
         let data = builder.build::<C>();
         let proof = data.prove(pw)?;
         
+        println!("I know a leaf whose merkle root is {}", proof.public_inputs[0]);
+
         data.verify(proof)
+
     }
 }
