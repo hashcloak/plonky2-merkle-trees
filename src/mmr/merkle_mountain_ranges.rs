@@ -1,12 +1,9 @@
-use std::cmp::max;
-
 use itertools::Itertools;
 use num::{PrimInt, ToPrimitive};
-use plonky2::{hash::{hash_types::HashOut, poseidon::PoseidonHash}, plonk::config::Hasher, fri::proof};
+use plonky2::{hash::{hash_types::HashOut, poseidon::PoseidonHash}, plonk::config::Hasher};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
-use crate::mmr;
-
+// Merkle Mountain Ranges see introduction here: https://github.com/opentimestamps/opentimestamps-server/blob/master/doc/merkle-mountain-range.md
 #[derive(Clone)]
 pub struct MMR {
     // holds values of all elements in mmr
@@ -26,9 +23,10 @@ pub struct MMR_proof {
 }
 
 
-// Return a number whose bits represent at what heights there are peaks
+// Return a number whose bits represent at what heights there are peaks + the height of the next element to be added
 // There is always at most 1 peak at each height, because if there are multiple, they get hashed together to a new peak
 // A bit set in a position means there is a peak there. Counting starts from the right at height 0.
+// Examples:
 // In: 1. Out: 1: peaks at height 1
 // In: 4. Out: 101 : peaks at height 2 and 0
 // In: 11. Out: 111 : peaks at heights 2,1 and 0
@@ -42,7 +40,7 @@ pub fn get_heights_bitmap_for_mmr_size(mmr_size: usize) -> (u64, usize) {
 
   // Now, iterate over each peak (bit) to see whether it's set or not
   // To decide if a peak is included, we check how many elements "fit" in the mmr_size
-  // Example mmr_size 25. 31, 15, 7 and 3 are the size of the subtrees of heights 4,3,2 and 1 resp.
+  // Example mmr_size 25. Then 31, 15, 7 and 3 are the size of the subtrees of heights 4,3,2 and 1 resp.
   // 25 >= 31 NO
   // 25 >= 15 YES set bit 1000
   // 10 >= 7 YES set bit 100
@@ -51,7 +49,7 @@ pub fn get_heights_bitmap_for_mmr_size(mmr_size: usize) -> (u64, usize) {
   // Result 1110
 
   // For each peak holds:
-  // If peak is at height x, the nr of elements is 2^{x+1}-1 = 2ˆx+2ˆ{x-1}+..+2ˆ1+1 This equals a number with x+1 bits set to 1
+  // If peak is at height x, the nr of elements of that subtree is 2^{x+1}-1 = 2ˆx+2ˆ{x-1}+..+2ˆ1+1 This equals a number with x+1 bits set to 1
   // For example, if peak is at height 4:
   // 2^5-1=31 (equals 2^4+2^3+2^2+2ˆ1+1=31) In bits 11111
 
@@ -62,7 +60,6 @@ pub fn get_heights_bitmap_for_mmr_size(mmr_size: usize) -> (u64, usize) {
   // In this number we'll be setting the bits where there are peaks
   let mut peaks: u64 = 0;
 
-  // let mut pos = mmr_size;
   while subtree_size > 0 {
     peaks <<= 1;
     // We include the peak at this position if the subtree fits within the mmr_size
@@ -70,9 +67,7 @@ pub fn get_heights_bitmap_for_mmr_size(mmr_size: usize) -> (u64, usize) {
       // Add peak
       peaks |= 1;
       updated_mmr_size -= subtree_size;
-      // pos -= subtree_size;
     }
-    
     // For next subtree size, we do a shift right
     subtree_size >>= 1;
   }
@@ -85,6 +80,7 @@ impl MMR {
     MMR { elements: Vec::new() }
   }
 
+  // Adds a leaf to the MMR and any further nodes that might be necessary
   pub fn add_leaf(&mut self, leaf: GoldilocksField) {
     if self.elements.is_empty() {
       self.elements.push(PoseidonHash::hash_or_noop(&[leaf]));
@@ -96,7 +92,7 @@ impl MMR {
 
     // Add new peaks as long as needed:
     //   Reading from right to left; add a new peak if there was a peak at the position
-    //   Once there's a gap of peaks we stop.
+    //   Once there's a gap of peaks we stop, because it means next up is a separate previous subtree 
     // Get inital peaks map based on mmr_size before adding new leaf
     let (mut peaks, pos) = get_heights_bitmap_for_mmr_size(self.elements.len());
     let mut current_pos = self.elements.len();
@@ -119,16 +115,33 @@ impl MMR {
   }
 
   pub fn bagging_the_peaks(self) -> HashOut<GoldilocksField> {
-    let peaks_indices = find_peaks(self.elements.len()).unwrap();
-    let peaks_elm: Vec<GoldilocksField> = peaks_indices.iter().flat_map(|i| self.elements[*i].elements).collect_vec();
+    let peaks = self.get_peaks();
+    let peaks_elm: Vec<GoldilocksField> = peaks.iter().flat_map(|h| h.elements).collect_vec();
     let root = PoseidonHash::hash_or_noop(&peaks_elm);
     root
   }
 
-  // TODO add `get_proof(standard_leaf_index: usize)`
+  fn add_right_elm(
+    curr_index: usize,
+    height: u32,
+    mmr: &MMR,
+    proof_elms: &mut Vec<(HashOut<GoldilocksField>, bool)>,
+    curr_index_mut: &mut usize,
+    intree_mut: &mut bool,
+  ) {
+    let next_elm_index = curr_index + (2.pow(height + 1) - 1);
+    if next_elm_index < mmr.elements.len() - 1 {
+        proof_elms.push((mmr.elements[next_elm_index], false));
+        *curr_index_mut = next_elm_index + 1;
+    } else {
+        *intree_mut = false;
+    }
+  }
 
-  // Walk up from the leaf, until the next sibling hash would fall outside the mmr. In that case the subtree top has been reached and the proof is done
+  // Return the merkle proof for leaf at mmr_index, which is the Merkle proof of the Merkle tree the leaf is part of
   pub fn get_subtree_proof_elm(mmr: MMR, mmr_index: usize) -> Vec<(HashOut<GoldilocksField>, bool)> {
+    // Walk up from the leaf, until the next sibling hash would fall outside the mmr. In that case the subtree top has been reached and the proof is done
+
     // Left sibling: index-(2^(h+1)-1). 16 - (2^1-1) = 15, 20 - (2^2-1) = 17 
     // Right sibling: index + (2^(h+1)-1)
     let mut proof_elms = Vec::new();
@@ -141,42 +154,27 @@ impl MMR {
         // Check if previous elm is at same height  
         let prev_elm_index = curr_index - (2.pow(height+1)-1);
         if get_heights_bitmap_for_mmr_size(prev_elm_index).1 == height.try_into().unwrap() {
-          // Start with left elm
+          // Add left hash to proof
           proof_elms.push((mmr.elements[prev_elm_index], true));
           curr_index += 1;
         } else {
-          let next_elm_index = curr_index + (2.pow(height+1)-1);
-          if (next_elm_index < mmr.elements.len() -1) {
-            proof_elms.push((mmr.elements[next_elm_index], false));
-            curr_index = next_elm_index + 1;
-          } else {
-            intree = false;
-          }
+          // Add right hash to proof
+          Self::add_right_elm(curr_index, height, &mmr, &mut proof_elms, &mut curr_index, &mut intree);
         }
       } else {
-        // TODO rewrite to avoid duplicate code
-        let next_elm_index = curr_index + (2.pow(height+1)-1);
-          if (next_elm_index < mmr.elements.len() -1) {
-            proof_elms.push((mmr.elements[next_elm_index], false));
-            curr_index = next_elm_index + 1;
-          } else {
-            intree = false;
-          }
+        // Add right hash to proof
+        Self::add_right_elm(curr_index, height, &mmr, &mut proof_elms, &mut curr_index, &mut intree);
       }
       height += 1;
     }
     proof_elms
   }
 
-  pub fn get_proof(self, mmr_index: usize) -> MMR_proof {
-    let mut peaks = Vec::new();
-
+  // Return peaks of this MMR
+  pub fn get_peaks(self) -> Vec<HashOut<GoldilocksField>> {
+    let mut peaks: Vec<HashOut<GoldilocksField>> = Vec::new();
     let mmr_len = self.elements.len();
 
-    // 1. Get the Merkle proof
-    let path = Self::get_subtree_proof_elm(self.clone(), mmr_index);
-    
-    // 2. Get the peaks
     // Try to fit in peaks until we get to the current position
     let mut max_tree_size:usize = (u32::MAX >> mmr_len.to_u32().unwrap().leading_zeros()).to_usize().unwrap();
     let mut current_index = mmr_len;
@@ -193,6 +191,24 @@ impl MMR {
       max_tree_size >>= 1;
         
     }
+    peaks
+  }
+  
+  // Returns "MMR proof" for leaf at given (normal) index
+  pub fn get_proof_normal_index(self, normal_index: usize) -> MMR_proof {
+    self.get_proof(get_mmr_index(normal_index))
+  }
+
+  // Returns "MMR proof" for leaf at given (mmr) index
+  //  this consists of a Merkle proof for the leaf in the subtree accompanied by all the peaks of the MMR
+  pub fn get_proof(self, mmr_index: usize) -> MMR_proof {
+    let mmr_len = self.elements.len();
+
+    // 1. Get the Merkle proof
+    let path = Self::get_subtree_proof_elm(self.clone(), mmr_index);
+    
+    // 2. Get the peaks
+    let peaks = self.get_peaks();
 
     MMR_proof {
       mmr_size: mmr_len,
@@ -203,6 +219,11 @@ impl MMR {
 }
 
 impl MMR_proof {
+  // Returns whether the proof verifies for the given leaf and root
+  // Checks:
+  // - Merkle proof for leaf checks out
+  // - the root of subtree is among peaks
+  // - hashing all roots together should give the root
   pub fn verify(self, leaf: GoldilocksField, root: HashOut<GoldilocksField>) -> bool {
     let leaf_hash = PoseidonHash::hash_or_noop(&[leaf]);
     // 1. Check Merkle proof of subtree
@@ -215,7 +236,7 @@ impl MMR_proof {
       }
     }
 
-    // Optional: Check this hash is among the peaks
+    // Check this hash is among the peaks
     assert!(self.peaks.contains(&next_hash));
 
     // 2. Hash all peaks together
@@ -226,9 +247,11 @@ impl MMR_proof {
   }
 }
 
-// Observation: The normal index represents the peaks bitmap with 1 difference
+// Returns the "MMR index" of the given "normal index"
+//  For example, the 4th leaf would have "normal index" 5, and mmr index 8
 pub fn get_mmr_index(leaf_normal_index: usize) -> usize {
-  let mut index = leaf_normal_index;
+// Observation: The normal index represents the peaks bitmap with 1 difference
+let mut index = leaf_normal_index;
   let mut height = 1;
   let mut res = 0;
   while index > 0 {
@@ -244,9 +267,8 @@ pub fn get_mmr_index(leaf_normal_index: usize) -> usize {
 #[cfg(test)]
 mod tests {
   use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
-use rand::Rng;
-  use crate::mmr::merkle_mountain_ranges::{MMR, get_heights_bitmap_for_mmr_size, get_mmr_index};
-  const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
+  use rand::Rng;
+  use crate::mmr::{merkle_mountain_ranges::{MMR, get_heights_bitmap_for_mmr_size, get_mmr_index}, common::GOLDILOCKS_FIELD_ORDER};
 
   #[test]
   fn test_heights_bitmap() {
@@ -314,7 +336,7 @@ use rand::Rng;
 
   #[test]
   fn test_get_proof() {
-    let nr_leaves = 4;
+    let nr_leaves = 16;
     let mut rng = rand::thread_rng();
     let mut mmr = MMR::new();
     let mut leaves = Vec::new();
@@ -331,11 +353,11 @@ use rand::Rng;
     // let standard_index = 8;
     // let leaf_index = 15; 
     // Test 2
-    // let standard_index = 4;
-    // let leaf_index = 7;
+    let standard_index = 4;
+    let leaf_index = 7;
     // Test 3
-    let standard_index = 0;
-    let leaf_index = 0;
+    // let standard_index = 0;
+    // let leaf_index = 0;
 
     let proof = mmr.clone().get_proof(leaf_index);
     println!("{:#?}", proof);

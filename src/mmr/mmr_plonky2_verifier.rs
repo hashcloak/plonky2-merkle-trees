@@ -1,11 +1,10 @@
 use itertools::Itertools;
 use plonky2::{hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig}, circuit_builder::CircuitBuilder}, iop::target::{BoolTarget, Target}};
 use plonky2_field::goldilocks_field::GoldilocksField;
+use crate::mmr::common::{equal, or_list};
 
-// TODO add these functions to utils or common file
-
-use crate::mmr::naive_mmr_plonky2_verifier::{equal, or_list};
-
+// Returns a HashOutTarget that equals option1 if pick_left is true and returns option2 otherwise
+// if pick_left: option1 else option2
 pub fn pick_hash(
   builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
   option1: HashOutTarget, 
@@ -22,22 +21,28 @@ pub fn pick_hash(
     let hash_elm2 = builder.mul_add(option1.elements[2], pick_left.target, t2);
     let hash_elm3 = builder.mul_add(option1.elements[3], pick_left.target, t3);
     HashOutTarget { elements: [hash_elm0, hash_elm1, hash_elm2, hash_elm3] }
-  }
+}
 
-
+// Returns a circuit that verifies an MMR proof that has:
+// - [nr_merkle_proof_elms] hashes that make up the Merkle proof of the subtree that the leaf is part of
+// - [nr_peaks] peaks that have to be hashed together to get to the root
+// Also returns targets that need to be set in the witness: (in order)
+// - Target: to set the leaf for which the proof is
+// - Vec<(HashOutTarget, BoolTarget)>: to set the merkle proof elements with indication whether that hash is on the left
+// - Vec<HashOutTarget>: to set the peaks
 pub fn verify_mmr_proof_circuit(
   nr_merkle_proof_elms: usize,
   nr_peaks: usize
   // Returns circuit data, targets for leaf, targets for proof elements (hashes), targets for peaks
 ) -> (CircuitData<GoldilocksField, PoseidonGoldilocksConfig, 2>, Target, Vec<(HashOutTarget, BoolTarget)>, Vec<HashOutTarget>) {
+  const D: usize = 2;
+  type C = PoseidonGoldilocksConfig;
+  type F = <C as GenericConfig<D>>::F;
+  // Verifying proof does the following:
   // 1. Hashes its way through the (public input) merkle proof elements
   // 2. Check result of (1) is amongst peaks
   //     (for this, compare it to all peaks and check that the OR of these comparisons together true)
   // 3. Hash peaks and compare to public input root
-
-  const D: usize = 2;
-  type C = PoseidonGoldilocksConfig;
-  type F = <C as GenericConfig<D>>::F;
 
   let mut proof_targets: Vec<(HashOutTarget, BoolTarget)> = Vec::new();
   let mut peak_targets: Vec<HashOutTarget> = Vec::new();
@@ -108,13 +113,11 @@ pub fn verify_mmr_proof_circuit(
 #[cfg(test)]
 mod tests {
   use anyhow::Result;
-use num::ToPrimitive;
-use plonky2::{iop::witness::WitnessWrite, plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, circuit_data::CircuitConfig, circuit_builder::CircuitBuilder}, hash::{hash_types::HashOutTarget, poseidon::PoseidonHash}};
-use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
-use rand::Rng;
+  use plonky2::{iop::witness::WitnessWrite, plonk::config::PoseidonGoldilocksConfig};
+  use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
+  use rand::Rng;
 
-use crate::mmr::{merkle_mountain_ranges::{MMR, get_mmr_index}, mmr_plonky2_verifier::verify_mmr_proof_circuit};
-  const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
+  use crate::mmr::{merkle_mountain_ranges::{MMR, get_mmr_index}, mmr_plonky2_verifier::verify_mmr_proof_circuit, common::GOLDILOCKS_FIELD_ORDER};
 
   fn test_mmr_verifier(nr_leaves: usize, leaf_normal_index: usize) -> Result<()> {
     let leaf_mmr_index: usize = get_mmr_index(leaf_normal_index);

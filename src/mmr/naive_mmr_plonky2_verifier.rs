@@ -3,7 +3,7 @@ use num::ToPrimitive;
 use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig}, circuit_builder::CircuitBuilder}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
-use crate::mmr::naive_merkle_mountain_ranges::get_standard_index;
+use crate::mmr::{naive_merkle_mountain_ranges::get_standard_index, common::{equal, or_list}};
 
 // Returns a circuit that verifies an mmr proof, and the targets that need to be set in the witness
 pub fn verify_naive_mmr_proof_circuit(
@@ -97,126 +97,18 @@ pub fn verify_naive_mmr_proof_circuit(
   (data, targets)
 }
 
-pub fn equal(
-  builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
-  first: HashOutTarget, 
-  second: HashOutTarget) -> BoolTarget {
-  let elm0 = builder.is_equal(first.elements[0], second.elements[0]);
-  let elm1 = builder.is_equal(first.elements[1], second.elements[1]);
-  let elm2 = builder.is_equal(first.elements[2], second.elements[2]);
-  let elm3 = builder.is_equal(first.elements[3], second.elements[3]);
-  let elm0_or_elm1 = builder.or(elm0, elm1);
-  let elm2_or_elm3 = builder.or(elm2, elm3);
-  builder.or(elm0_or_elm1, elm2_or_elm3)
-}
-
-pub fn or_list(
-  builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
-  ins: Vec<BoolTarget>) -> BoolTarget {
-    assert!(ins.len() > 0 );
-    if ins.len() == 1 {
-      return ins[0];
-    } else if ins.len() == 2 {
-      return builder.or(ins[0], ins[1]); 
-    } else {
-      let mut pairs: Vec<BoolTarget> = Vec::new();
-      for pair in ins.chunks(2) {
-        if pair.len() > 1 {
-          pairs.push(builder.or(pair[0], pair[1]));
-        } else {
-          pairs.push(pair[0]);
-        }
-        
-      }
-      return or_list(builder, pairs);
-    }
-  }
-
 #[cfg(test)]
 mod tests {
   use anyhow::Result;
   use plonky2_field::{goldilocks_field::GoldilocksField, types::Field};
-  use plonky2::{iop::witness::WitnessWrite, plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::CircuitConfig, circuit_builder::CircuitBuilder}};
+  use plonky2::{iop::witness::WitnessWrite, plonk::config::PoseidonGoldilocksConfig};
   use rand::Rng;
 
-  use crate::mmr::{naive_merkle_mountain_ranges::naive_MMR, naive_mmr_plonky2_verifier::or_list};
+  use crate::mmr::naive_merkle_mountain_ranges::naive_MMR;
 
   use super::verify_naive_mmr_proof_circuit;
   const GOLDILOCKS_FIELD_ORDER: u64 = 18446744069414584321;
 
-  #[test]
-  fn test_or_list_result_true() -> Result<()> {
-    
-    const D: usize = 2;
-    type C = PoseidonGoldilocksConfig;
-    type F = <C as GenericConfig<D>>::F;
-
-    let config = CircuitConfig::standard_recursion_config();
-    let mut builder: CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2> = CircuitBuilder::<F, D>::new(config);
-    let b0 = builder.add_virtual_bool_target_safe();
-    let b1 = builder.add_virtual_bool_target_safe();
-    let b2 = builder.add_virtual_bool_target_safe();
-    let b3 = or_list(&mut builder, [b0,b1,b2].to_vec());
-
-    
-    let one: plonky2::iop::target::Target = builder.one();
-    builder.connect(one, b3.target); // this is how we can test for true /false. Somehow assert_bool doesn't work
-    let circuit_data = builder.build();
-
-    // false true false
-    let mut pw1 = plonky2::iop::witness::PartialWitness::new();
-    pw1.set_bool_target(b0, false);
-    pw1.set_bool_target(b1, true);
-    pw1.set_bool_target(b2, false);
-
-    let proof1: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-    circuit_data.prove(pw1)?;
-
-    circuit_data.verify(proof1);
-
-    // true true true
-    let mut pw2 = plonky2::iop::witness::PartialWitness::new();
-    pw2.set_bool_target(b0, true);
-    pw2.set_bool_target(b1, true);
-    pw2.set_bool_target(b2, true);
-
-    let proof2: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-    circuit_data.prove(pw2)?;
-
-    circuit_data.verify(proof2)
-  }
-
-  #[test]
-  fn test_or_list_result_false() -> Result<()> {
-    
-    const D: usize = 2;
-    type C = PoseidonGoldilocksConfig;
-    type F = <C as GenericConfig<D>>::F;
-
-    let config = CircuitConfig::standard_recursion_config();
-    let mut builder: CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2> = CircuitBuilder::<F, D>::new(config);
-    let b0 = builder.add_virtual_bool_target_safe();
-    let b1 = builder.add_virtual_bool_target_safe();
-    let b2 = builder.add_virtual_bool_target_safe();
-    let b3 = builder.add_virtual_bool_target_safe();
-    let b4 = or_list(&mut builder, [b0,b1,b2,b3].to_vec());
-    
-    let zero: plonky2::iop::target::Target = builder.zero();
-    builder.connect(zero, b4.target); // this is how we can test for true /false. Somehow assert_bool doesn't work
-    let circuit_data = builder.build();
-
-    // false false false false
-    let mut pw1 = plonky2::iop::witness::PartialWitness::new();
-    pw1.set_bool_target(b0, false);
-    pw1.set_bool_target(b1, false);
-    pw1.set_bool_target(b2, false);
-    pw1.set_bool_target(b3, false);
-
-    let proof1: plonky2::plonk::proof::ProofWithPublicInputs<GoldilocksField, PoseidonGoldilocksConfig, 2> = 
-    circuit_data.prove(pw1)?;
-
-    circuit_data.verify(proof1)
-  }
 
   pub fn do_test_verify_proof(nr_leaves: usize, leaf_index: usize) -> Result<()> {
     let mut rng = rand::thread_rng();

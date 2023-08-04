@@ -3,7 +3,7 @@ use num::ToPrimitive;
 use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_data::{CircuitData, CircuitConfig, CommonCircuitData, VerifierCircuitTarget}, circuit_builder::CircuitBuilder, proof::ProofWithPublicInputsTarget}, hash::{poseidon::PoseidonHash, hash_types::HashOutTarget}, iop::target::BoolTarget};
 use plonky2_field::goldilocks_field::GoldilocksField;
 
-use crate::mmr::{naive_merkle_mountain_ranges::get_standard_index, naive_mmr_plonky2_verifier::{equal, or_list}};
+use crate::mmr::{naive_merkle_mountain_ranges::get_standard_index, common::{equal, or_list}};
 
 /** 
  * An mmr proof consists of 2 parts:
