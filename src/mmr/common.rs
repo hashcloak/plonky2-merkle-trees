@@ -37,6 +37,26 @@ pub fn or_list(
     }
 }
 
+// Returns a HashOutTarget that equals option1 if pick_left is true and returns option2 otherwise
+// if pick_left: option1 else option2
+pub fn pick_hash(
+  builder: &mut CircuitBuilder<plonky2::field::goldilocks_field::GoldilocksField, 2>,
+  option1: HashOutTarget, 
+  option2: HashOutTarget, 
+  pick_left: BoolTarget) -> HashOutTarget {
+    let opposite = builder.not(pick_left);
+
+    let t0 = builder.mul(option2.elements[0], opposite.target);
+    let t1 = builder.mul(option2.elements[1], opposite.target);
+    let t2 = builder.mul(option2.elements[2], opposite.target);
+    let t3 = builder.mul(option2.elements[3], opposite.target);
+    let hash_elm0 = builder.mul_add(option1.elements[0], pick_left.target,  t0);
+    let hash_elm1 = builder.mul_add(option1.elements[1], pick_left.target, t1);
+    let hash_elm2 = builder.mul_add(option1.elements[2], pick_left.target, t2);
+    let hash_elm3 = builder.mul_add(option1.elements[3], pick_left.target, t3);
+    HashOutTarget { elements: [hash_elm0, hash_elm1, hash_elm2, hash_elm3] }
+}
+
 #[cfg(test)]
 mod tests {
   use anyhow::Result;

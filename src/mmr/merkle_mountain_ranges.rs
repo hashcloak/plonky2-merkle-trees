@@ -22,6 +22,11 @@ pub struct MMR_proof {
   pub peaks: Vec<HashOut<GoldilocksField>>
 }
 
+pub struct MMR_extended_proof {
+  mmr_proof: MMR_proof,
+  root_subtree: HashOut<GoldilocksField>
+}
+
 
 // Return a number whose bits represent at what heights there are peaks + the height of the next element to be added
 // There is always at most 1 peak at each height, because if there are multiple, they get hashed together to a new peak

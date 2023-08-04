@@ -79,6 +79,7 @@ pub fn verify_inner_merkle_proof_circuit(
   (data, targets)
 }
 
+// This is the same as for the non-naive impl
 /**
  * Returns a circuit for the outer proof, which does the following:
  * - verifies inner proof
