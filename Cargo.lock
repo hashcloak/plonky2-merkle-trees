@@ -163,6 +163,7 @@ name = "incremental_mt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "log",
  "plonky2",
  "rand",
 ]
