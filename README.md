@@ -18,4 +18,4 @@ Additionally, there is a "naive" implementation which requires more space to kee
 
 ### Run
 
-Tests have been added to all `mmr` files, which can be run from within the file, using the play button in an IDE.
+Tests have been added to all `mmr` files, which can be run from within the file, using the play button in git pishan IDE.

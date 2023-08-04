@@ -4,24 +4,24 @@ Merkle Mountain Ranges (MMR) were proposed by Peter Todd. The introduction can b
 
 ## Short description
 
-An MMR is a tree that consists of multiple sub-trees next to each other. The largest tree is always on left and the smallest on the left. 
+An MMR is a tree that consists of multiple sub-trees next to each other. The largest tree is always on left and the smallest on the right. 
 
-The tree is mutable; leaves can be appended continuously. With new leaves being appended, they can complete next trees which can in turn grow large enough to complete even larger trees together with previous subtrees.
+The tree is mutable; leaves can be appended continuously. With new leaves being added, they can complete next trees which can in turn grow large enough to complete even larger trees together with previous subtrees.
 
-Example with size 19:
+Example of MMR with size 19, the numbering indicates the order in which the elements were added:
 <p float="left">
   <img src="img/MMR1.png" width="500" />
   <p>Figure 1. An example of Merkle Mountain Ranges.</p>
 </p>
 
 
-When the next leaf is added, this trigger completing the small Merkle tree of 3 elements. Then we have 3 Merkle trees of the same height next to each other, and they are connected into a larger Merkle tree of height 1 higher. 
+When the next leaf is added to the example tree of size 19, this trigger completing a small Merkle tree of 3 elements. Then we have 2 Merkle trees of the same height (1) next to each other, therefore they are connected into a larger Merkle tree of height 2. 
 <p float="left">
   <img src="img/MMR2.png" width="500" /> 
   <p>Figure 2. A leaf is added.</p>
 </p>
 
-The next leaf that is added doesn't complete any tree and the MMR stays like that. 
+The next leaf that is added doesn't complete any tree, so no further action is taken.
 <p float="left">
   <img src="img/MMR3.png" width="500" /> 
   <p>Figure 3. Another leaf is added.</p>
@@ -53,11 +53,11 @@ To get a single root for the MMR, all peaks are hashed together. This process is
 ### "MMR proof"
 
 A proof for this type of tree consists of the following:
-1. A Merkle proof for the leaf wrt its subtree
+1. A Merkle proof for the leaf w.r.t its subtree
 2. A list of all the peaks in the MMR
 
 A proof is valid if:
-- The Merkle proof checks out
+- The (subtree) Merkle proof checks out
 - The resulting hash of the Merkle proof is contained in the list of peaks
 - Hashing the peaks together leads to MMR root
 
@@ -66,10 +66,10 @@ A proof is valid if:
 ### MMR implementations
 There are 2 versions of MMR implemented: a naive version and an optimized version. 
 
-The "naive" version keeps track of the elements, what heights all elements are at, the peaks, the number of leaves and the maximum height reached in the tree.
+The "naive" version keeps track of the elements, heights of all elements, the peaks, the number of leaves and the maximum height reached in the tree.
 
 The optimized version only holds an (ordered) array of elements of the MMR and the rest is calculated on the go.
 
 ### MMR proof verifiers
 
-Both implementations have the option to generate a proof. Plonky2 verifiers have been added, both with and without recursion.
+Both implementations have the option to generate a proof. Plonky2 verifiers have been added, both with and without recursion. In the recursive verifier the proof of verification of subtree Merkle tree is embedded, before doing the check of hashing together all peaks and comparing it to the root.
