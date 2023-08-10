@@ -3,7 +3,6 @@
 use itertools::Itertools;
 use num::Integer;
 use plonky2::field::goldilocks_field::GoldilocksField;
-use plonky2::fri::proof;
 use plonky2::hash::hash_types::HashOut;
 use plonky2::hash::poseidon::PoseidonHash;
 use plonky2::plonk::config::Hasher;
@@ -68,7 +67,7 @@ impl MerkleTree {
         level_i[updated_index+1]
       };
       proof_hashes.push(selected_hash);
-      updated_index = updated_index.div_floor(&2);
+      updated_index = updated_index/2;
     }
 
     proof_hashes
@@ -102,7 +101,7 @@ pub fn verify_merkle_proof(leaf: GoldilocksField, leaf_index: usize, root: HashO
     } else {
       next_hash = PoseidonHash::two_to_one(hashes[i], next_hash);
     }
-    updated_index = updated_index.div_floor(&2);
+    updated_index = updated_index/2;
   }
   
   // Finally: compare final hash with root
@@ -112,10 +111,8 @@ pub fn verify_merkle_proof(leaf: GoldilocksField, leaf_index: usize, root: HashO
 #[cfg(test)]
 mod tests {
   use anyhow::Result;
-use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
-
-
-use crate::merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
+  use plonky2::{plonk::config::{GenericConfig, PoseidonGoldilocksConfig}, hash::hash_types::HashOut, field::{goldilocks_field::GoldilocksField, types::Field}};
+  use crate::simple_merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
 
   #[test]
   fn test_build_merkle_tree_4_leaves() -> Result<()> {
@@ -126,19 +123,21 @@ use crate::merkle_tree::simple_merkle_tree::{MerkleTree, verify_merkle_proof};
       GoldilocksField::from_canonical_u64(2876514289), 
       GoldilocksField::from_canonical_u64(984286162)
       ].to_vec();
-    let tree: MerkleTree = MerkleTree::build(leaves);
+    let _tree: MerkleTree = MerkleTree::build(leaves);
     
-    println!( "{:?}", tree.count_levels);
-    println!( "{:?}", tree.tree);
-    println!( "{:?}", tree.root);
+    // println!( "{:?}", tree.count_levels);
+    // println!( "{:?}", tree.tree);
+    // println!( "{:?}", tree.root);
     /*
-2
-level0
-[[HashOut { elements: [2890852870, 0, 0, 0] }, HashOut { elements: [156728478, 0, 0, 0] }, HashOut { elements: [2876514289, 0, 0, 0] }, HashOut { elements: [984286162, 0, 0, 0] }], 
-level1
-[HashOut { elements: [6678006133445961348, 15827935749738443865, 6295652393730592048, 1546515167911236130] }, HashOut { elements: [6698018865469624861, 12486244005715193285, 11330639022572315007, 6059804404595156248] }]]
-root
-HashOut { elements: [13451271846715771774, 4069913004933160254, 14528216580130305557, 9716424959297545638] }
+    Output looks something like this:
+
+    2
+    level0
+    [[HashOut { elements: [2890852870, 0, 0, 0] }, HashOut { elements: [156728478, 0, 0, 0] }, HashOut { elements: [2876514289, 0, 0, 0] }, HashOut { elements: [984286162, 0, 0, 0] }], 
+    level1
+    [HashOut { elements: [6678006133445961348, 15827935749738443865, 6295652393730592048, 1546515167911236130] }, HashOut { elements: [6698018865469624861, 12486244005715193285, 11330639022572315007, 6059804404595156248] }]]
+    root
+    HashOut { elements: [13451271846715771774, 4069913004933160254, 14528216580130305557, 9716424959297545638] }
     */
     Ok(())
   }
@@ -167,12 +166,14 @@ HashOut { elements: [13451271846715771774, 4069913004933160254, 1452821658013030
       F::from_noncanonical_u128(14133393155459789216), 
       F::from_noncanonical_u128(9890944065319669426),
       ].to_vec();
-    let tree: MerkleTree  = MerkleTree::build(leaves);
+    let _tree: MerkleTree  = MerkleTree::build(leaves);
     
-    println!( "{:?}", tree.count_levels);
-    println!( "{:?}", tree.tree);
-    println!( "{:?}", tree.root);
+    // println!( "{:?}", tree.count_levels);
+    // println!( "{:?}", tree.tree);
+    // println!( "{:?}", tree.root);
     /*
+    Output looks something like this:
+
     level
     4
 
@@ -206,67 +207,10 @@ HashOut { elements: [13451271846715771774, 4069913004933160254, 1452821658013030
     let tree: MerkleTree  = MerkleTree::build(leaves);
     
     let res_leaf_0 = tree.clone().get_merkle_proof(0);
-    // println!( "{:?}", res_leaf_0);
     assert!(res_leaf_0[0] == HashOut { elements: [F::from_canonical_u64(156728478), F::default(), F::default(), F::default()] });
     assert!(res_leaf_0[1] == HashOut { elements: [F::from_canonical_u64(6698018865469624861), F::from_canonical_u64(12486244005715193285), F::from_canonical_u64(11330639022572315007), F::from_canonical_u64(6059804404595156248)] });
-
-    let res_leaf_3 = tree.clone().get_merkle_proof(3);
-    // println!( "{:?}", res_leaf_3);
-    /*
-    res_leaf_0
-    HashOut { elements: [156728478, 0, 0, 0] }
-    HashOut { elements: [6698018865469624861, 12486244005715193285, 11330639022572315007, 6059804404595156248] }
-    
-    res_leaf_3
-    HashOut { elements: [2876514289, 0, 0, 0] }
-    HashOut { elements: [6678006133445961348, 15827935749738443865, 6295652393730592048, 1546515167911236130] }
-     */
     Ok(())
   }
-
-  #[test]
-  fn test_merkle_proof_tree_8() -> Result<()> {
-    const D: usize = 2;
-    type C = PoseidonGoldilocksConfig;
-    type F = <C as GenericConfig<D>>::F;
-
-    let leaves = [
-      F::from_noncanonical_u128(14786323743454721611), 
-      F::from_noncanonical_u128(976503040092093812), 
-      F::from_noncanonical_u128(4644130751253292674), 
-      F::from_noncanonical_u128(6522877527545910706),
-      F::from_noncanonical_u128(11021172818651636092), 
-      F::from_noncanonical_u128(12048403458499719587), 
-      F::from_noncanonical_u128(11457874926809001558), 
-      F::from_noncanonical_u128(14982007443548219923)
-      ].to_vec();
-    let tree: MerkleTree = MerkleTree::build(leaves);
-
-    let res_leaf_0 = tree.clone().get_merkle_proof(0);
-    // println!( "{:?}", res_leaf_0);
-    /**
-    HashOut { elements: [976503040092093812, 0, 0, 0] }
-    HashOut { elements: [13939588529466633382, 10763620781372339433, 2004324520800166618, 12719277447629989832] }
-    HashOut { elements: [12809105246780417325, 17913287784403914705, 15645466341003679334, 9087376211576685650] }
-    */
-    let res_leaf_3 = tree.clone().get_merkle_proof(3);
-    // println!( "{:?}", res_leaf_3);
-    /*
-    HashOut { elements: [4644130751253292674, 0, 0, 0] }
-    HashOut { elements: [16072672881132969138, 16679487992876356669, 4319836168073005766, 14599992432910949662] }
-    HashOut { elements: [12809105246780417325, 17913287784403914705, 15645466341003679334, 9087376211576685650] }
-     */
-    let res_leaf_7 = tree.clone().get_merkle_proof(7);
-    // println!( "{:?}", res_leaf_7);
-    /*
-    HashOut { elements: [11457874926809001558, 0, 0, 0] }
-    HashOut { elements: [14656282042201240311, 6170970616712589521, 11157357638961986056, 5438125353060943827] }
-    HashOut { elements: [2804654470754882522, 10755905498140000489, 4068725548728740598, 3390508811108791323] }
-    */
-    
-    Ok(())
-  }
-
 
   #[test]
   fn test_verify_small_merkle_proof() -> Result<()> {

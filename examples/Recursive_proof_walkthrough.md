@@ -15,7 +15,7 @@ In the initial step the 2 hashes of the leaves are the input, and the hash of th
 In the recursive step, the proof of the previous step is used in the circuit, as well as the hash on the other side and once again the expected result (Merkle digest) is the public input. 
 <p float="left">
   <img src="img/recursive_step_merkle_tree_ref.png" width="300" />
-  <img src="img/recursive_step.png" width="500" /> 
+  <img src="img/recursive_step_1.png" width="500" /> 
 </p>
 
 This recursive pattern is repeated until all levels have been traversed and a single proof that verifies the total merkle proof is the result. 
@@ -44,7 +44,7 @@ The left and right hash are "added" as virtual hashes to the builder, which mean
 We also add those to the vector `w_targets` so they can be filled in the witness when being used.
 
 ```rust
-  let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+  let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
     left_hash_target.elements.to_vec(), 
     right_hash_target.elements.to_vec()
   ].concat());
@@ -63,7 +63,7 @@ Returning both the circuit data and the elements that have to be added to the wi
 ### Details: recursive_step
 
 Recall that for this step we have the following flow:
-<p><img src="img/recursive_step.png" width="500"></p>
+<p><img src="img/recursive_step_1.png" width="500"></p>
 
 Thus, inputs are a previous proof and a next hash. As public input (and thus the desired outcome) we have the Merkle digest. 
 
@@ -111,7 +111,7 @@ In the current proof, the previous proof gets verified.
     // Add target for sibling hash (that's on the right)
     let right_hash_target = builder.add_virtual_hash();
     targets.push(right_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       input_hash.elements.to_vec(), 
       right_hash_target.elements.to_vec()
     ].concat());
@@ -121,7 +121,7 @@ In the current proof, the previous proof gets verified.
     // Add target for sibling hash (that's on the left)
     let left_hash_target = builder.add_virtual_hash();
     targets.push(left_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       left_hash_target.elements.to_vec(),
       input_hash.elements.to_vec()
     ].concat());
@@ -137,7 +137,7 @@ Let's assume `sibling_right_side = true`, then we have the following steps:
     // Add target for sibling hash (that's on the right)
     let right_hash_target = builder.add_virtual_hash();
     targets.push(right_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       input_hash.elements.to_vec(), 
       right_hash_target.elements.to_vec()
     ].concat());

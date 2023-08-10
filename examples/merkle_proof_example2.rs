@@ -1,5 +1,5 @@
 use anyhow::Result;
-use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, PoseidonHashConfig, Hasher}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData, VerifierCircuitTarget}, proof::{self, ProofWithPublicInputsTarget, ProofWithPublicInputs}}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::{witness::{WitnessWrite, PartialWitness}, target::Target}, field::{goldilocks_field::GoldilocksField, types::Field}};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData, VerifierCircuitTarget}, proof::{self, ProofWithPublicInputsTarget, ProofWithPublicInputs}}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::{witness::{WitnessWrite, PartialWitness}, target::Target}, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 /**
  * Recursive zkp for verifying merkle proof.
@@ -32,7 +32,7 @@ use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Poseidon
   w_targets.push(left_hash_target);
   w_targets.push(right_hash_target);
 
-  let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+  let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
     left_hash_target.elements.to_vec(), 
     right_hash_target.elements.to_vec()
   ].concat());
@@ -90,7 +90,7 @@ use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Poseidon
     // Add target for sibling hash (that's on the right)
     let right_hash_target = builder.add_virtual_hash();
     targets.push(right_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       input_hash.elements.to_vec(), 
       right_hash_target.elements.to_vec()
     ].concat());
@@ -100,7 +100,7 @@ use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, Poseidon
     // Add target for sibling hash (that's on the left)
     let left_hash_target = builder.add_virtual_hash();
     targets.push(left_hash_target);
-    let merkle_digest_target = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    let merkle_digest_target = builder.hash_or_noop::<PoseidonHash>([
       left_hash_target.elements.to_vec(),
       input_hash.elements.to_vec()
     ].concat());
@@ -196,7 +196,7 @@ mod tests {
   use anyhow::Result;
   use plonky2::{plonk::config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, hash::{poseidon::PoseidonHash, hash_types::{RichField, HashOut}}, iop::witness::WitnessWrite, gates::poseidon::PoseidonGenerator};
 use plonky2_field::{goldilocks_field::GoldilocksField, types::{Field, Sample}};
-  use plonky2_merkle_trees::merkle_tree::simple_merkle_tree::MerkleTree;
+  use plonky2_merkle_trees::simple_merkle_tree::simple_merkle_tree::MerkleTree;
 use rand::Rng;
 
   use crate::{initial_proof_circuit, recursive_step, verify_merkle_proof_circuit_and_proof};

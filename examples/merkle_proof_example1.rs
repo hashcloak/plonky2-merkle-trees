@@ -1,4 +1,4 @@
-use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig, PoseidonHashConfig}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData}, proof}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::witness::{WitnessWrite, PartialWitness}, field::{goldilocks_field::GoldilocksField, types::Field}};
+use plonky2::{plonk::{config::{PoseidonGoldilocksConfig, GenericConfig}, circuit_builder::CircuitBuilder, circuit_data::{CircuitConfig, VerifierOnlyCircuitData, CommonCircuitData, CircuitData}, proof}, hash::{hash_types::{RichField, HashOut, HashOutTarget}, poseidon::PoseidonHash}, iop::witness::{WitnessWrite, PartialWitness}, field::{goldilocks_field::GoldilocksField, types::Field}};
 
 /**
  * zkp for veryfing merkle proof
@@ -26,12 +26,12 @@ pub fn verify_merkle_proof_circuit(leaf_index: usize, nr_layers: usize) -> (Circ
 
   let mut next_hash: plonky2::hash::hash_types::HashOutTarget;
   if leaf_index % 2 == 0 {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       leaf_to_prove.elements.to_vec(), 
       merkle_proof_elm.elements.to_vec()
     ].concat());
   } else {
-    next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+    next_hash = builder.hash_or_noop::<PoseidonHash>([
       merkle_proof_elm.elements.to_vec(),
       leaf_to_prove.elements.to_vec()
     ].concat());
@@ -44,12 +44,12 @@ pub fn verify_merkle_proof_circuit(leaf_index: usize, nr_layers: usize) -> (Circ
     targets.push(merkle_proof_elm);
 
     if current_layer_index % 2 == 0 {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         next_hash.elements.to_vec(), 
         merkle_proof_elm.elements.to_vec()
       ].concat());
     } else {
-      next_hash = builder.hash_or_noop::<PoseidonHashConfig, PoseidonHash>([
+      next_hash = builder.hash_or_noop::<PoseidonHash>([
         merkle_proof_elm.elements.to_vec(),
         next_hash.elements.to_vec()
       ].concat());
@@ -68,7 +68,7 @@ mod tests {
   use anyhow::Result;
   use plonky2::{plonk::config::{PoseidonGoldilocksConfig, GenericConfig, Hasher}, hash::{poseidon::PoseidonHash, hash_types::RichField}, iop::witness::WitnessWrite, gates::poseidon::PoseidonGenerator};
 use plonky2_field::{goldilocks_field::GoldilocksField, types::{Field, Sample}};
-  use plonky2_merkle_trees::merkle_tree::simple_merkle_tree::MerkleTree;
+  use plonky2_merkle_trees::simple_merkle_tree::simple_merkle_tree::MerkleTree;
 use rand::Rng;
 
   use crate::verify_merkle_proof_circuit;
