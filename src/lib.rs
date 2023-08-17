@@ -1,3 +1,6 @@
+#![no_std]
+#![no_main]
+// #![cfg_attr(not(test), no_std)]
 use plonky2::{
 
     hash::{
@@ -27,8 +30,12 @@ use plonky2::plonk::circuit_data::VerifierOnlyCircuitData;
 use plonky2::plonk::circuit_data::CommonCircuitData;
 use log::Level;
 use plonky2::plonk::prover::prove;
-use std::iter;
+use core::iter;
 use anyhow::{Result, Ok};
+
+#[macro_use]
+extern crate alloc;
+use alloc::vec::Vec;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IncrementalTree<F: RichField, H: Hasher<F>> {
@@ -243,6 +250,9 @@ mod tests {
     use crate::verify;
     use crate::WitnessWrite;
     use crate::Result;
+    use plonky2::plonk::circuit_data::VerifierCircuitTarget;
+    use crate::recursive_proof;
+    use crate::ProofWithPublicInputs;
 
     #[test]
     fn create_tree_test(){
@@ -254,9 +264,6 @@ mod tests {
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
         let tree = IncrementalTree::<F, <C as GenericConfig<D>>::Hasher>::new(zero_hash, cap_height);
-
-        println!("Empty tree of height {:?} created", cap_height);
-        println!("{:?}", tree);
 
     }
 
@@ -274,9 +281,6 @@ mod tests {
         for i in 0..5 {
             tree.insert(PoseidonHash::hash_or_noop(&vec![GoldilocksField::from_canonical_u64(i + i*i + 2)]));
         }
-
-        println!("Tree after leaves inserted:");
-        println!("{:?}", tree);
     }
 
     #[test]
@@ -352,9 +356,6 @@ mod tests {
         let data = builder.build::<C>();
         let proof = data.prove(pw)?;
         
-        println!("I know a leaf whose merkle root is {}", proof.public_inputs[0]);
-
-        println!("{:?}, {:?}, {:?}", proof, data.verifier_only, data.common);
         data.verify(proof.clone())
 
     }
@@ -408,10 +409,7 @@ mod tests {
 
     //     let data = builder.build::<C>();
     //     let proof = data.prove(pw)?;
-        
-    //     println!("I know a leaf whose merkle root is {}", proof.public_inputs[0]);
 
-    //     println!("{:?}, {:?}, {:?}", proof, data.verifier_only, data.common);
 
     //     let _ = data.verify(proof.clone());
     //     //second leaf proof
@@ -445,10 +443,6 @@ mod tests {
     //     let data2 = builder2.build::<C>();
     //     let proof2 = data2.prove(pw2)?;
         
-    //     println!("I know a leaf whose merkle root is {}", proof2.public_inputs[0]);
-
-    //     println!("{:?}, {:?}, {:?}", proof2, data2.verifier_only, data2.common);
-
     //     let config3 = CircuitConfig::standard_recursion_config();
 
     //     let inner = (proof, data.verifier_only.clone(), data.common.clone());
@@ -517,9 +511,6 @@ mod tests {
     //     let data = builder.build::<C>();
     //     let proof = data.prove(pw)?;
         
-    //     println!("I know a leaf whose merkle root is {}", proof.public_inputs[0]);
-
-    //     println!("{:?}, {:?}, {:?}", proof, data.verifier_only, data.common);
 
     //     let _ = data.verify(proof.clone());
 
@@ -553,10 +544,6 @@ mod tests {
 
     //     let data2 = builder2.build::<C>();
     //     let proof2 = data2.prove(pw2)?;
-        
-    //     println!("I know a leaf whose merkle root is {}", proof2.public_inputs[0]);
-
-    //     println!("{:?}, {:?}, {:?}", proof2, data2.verifier_only, data2.common);
 
     //     let config3 = CircuitConfig::standard_recursion_zk_config();
     //     let mut builder3 = CircuitBuilder::new(config3);
