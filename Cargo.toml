@@ -1,3 +1,4 @@
+workspace = { members = ["merkle_proof_verification"] }
 [package]
 name = "plonky2_merkle_trees"
 version = "0.1.0"
